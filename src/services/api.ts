@@ -82,7 +82,10 @@ class APIService {
   }
 
   private async fetchAPI(endpoint: string, options: RequestInit = {}) {
-    const url = `${API_BASE_URL}${endpoint}`;
+    // Remove trailing slash from base URL and leading slash from endpoint to avoid double slashes
+    const baseURL = API_BASE_URL.replace(/\/$/, '');
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const url = `${baseURL}${cleanEndpoint}`;
     console.log("[Membrane] Fetching:", url);
 
     try {
