@@ -28,15 +28,17 @@ app = FastAPI(title="Membrane API", version="1.0.0")
 # Initialize database
 init_db()
 
-# CORS configuration - allow Codespaces and localhost
+# CORS configuration - allow Codespaces, localhost, and Railway
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
         "https://*.app.github.dev",
-        "https://*.githubpreview.dev"
+        "https://*.githubpreview.dev",
+        "https://*.railway.app",
+        "https://*.up.railway.app"
     ],
-    allow_origin_regex=r"https://.*\.app\.github\.dev|https://.*\.githubpreview\.dev",
+    allow_origin_regex=r"https://.*\.app\.github\.dev|https://.*\.githubpreview\.dev|https://.*\.railway\.app|https://.*\.up\.railway\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -1511,4 +1513,6 @@ async def get_models():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    import os
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)

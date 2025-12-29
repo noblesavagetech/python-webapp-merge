@@ -4,31 +4,39 @@ const getAPIBaseURL = () => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
-  
-  if (typeof window === 'undefined') return 'http://localhost:8000';
-  
+
+  if (typeof window === "undefined") return "http://localhost:8000";
+
   const hostname = window.location.hostname;
   const protocol = window.location.protocol;
-  
+
   // GitHub Codespaces: hostname pattern is "username-repo-xxxx-3000.app.github.dev"
-  if (hostname.includes('.app.github.dev') || hostname.includes('.githubpreview.dev')) {
-    const newHostname = hostname.replace(/-3000\./, '-8000.');
+  if (
+    hostname.includes(".app.github.dev") ||
+    hostname.includes(".githubpreview.dev")
+  ) {
+    const newHostname = hostname.replace(/-3000\./, "-8000.");
     return `${protocol}//${newHostname}`;
   }
-  
+
   // Railway: if deployed on Railway, backend should be on a different service
   // User needs to set VITE_API_URL in Railway environment variables
-  if (hostname.includes('.railway.app') || hostname.includes('.up.railway.app')) {
-    console.error('Railway deployment detected. Please set VITE_API_URL environment variable to your backend URL');
-    return 'BACKEND_URL_NOT_SET'; // Will cause visible error
+  if (
+    hostname.includes(".railway.app") ||
+    hostname.includes(".up.railway.app")
+  ) {
+    console.error(
+      "Railway deployment detected. Please set VITE_API_URL environment variable to your backend URL"
+    );
+    return "BACKEND_URL_NOT_SET"; // Will cause visible error
   }
-  
+
   // Local development
-  return 'http://localhost:8000';
+  return "http://localhost:8000";
 };
 
 export const API_BASE_URL = getAPIBaseURL();
-console.log('[Membrane] API_BASE_URL:', API_BASE_URL);
+console.log("[Membrane] API_BASE_URL:", API_BASE_URL);
 
 export interface Model {
   id: string;
@@ -38,7 +46,7 @@ export interface Model {
 }
 
 export interface ChatMessage {
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
 }
 
@@ -64,10 +72,10 @@ export interface Project {
 
 class APIService {
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem("auth_token");
     if (token) {
       return {
-        'Authorization': `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       };
     }
     return {};
@@ -75,87 +83,95 @@ class APIService {
 
   private async fetchAPI(endpoint: string, options: RequestInit = {}) {
     const url = `${API_BASE_URL}${endpoint}`;
-    console.log('[Membrane] Fetching:', url);
-    
+    console.log("[Membrane] Fetching:", url);
+
     try {
       const response = await fetch(url, {
         ...options,
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           ...this.getAuthHeaders(),
           ...options.headers,
         },
-        credentials: 'omit', // Don't send credentials for Codespaces cross-origin requests
+        credentials: "omit", // Don't send credentials for Codespaces cross-origin requests
       });
 
       if (!response.ok) {
-        console.error('[Membrane] HTTP Error:', response.status, response.statusText);
+        console.error(
+          "[Membrane] HTTP Error:",
+          response.status,
+          response.statusText
+        );
         throw new Error(`API Error: ${response.statusText}`);
       }
 
       return response;
     } catch (error) {
-      console.error('[Membrane] Fetch failed:', error);
+      console.error("[Membrane] Fetch failed:", error);
       throw error;
     }
   }
 
   // Authentication methods
-  async signup(email: string, password: string, name?: string): Promise<AuthResponse> {
-    const response = await this.fetchAPI('/api/auth/signup', {
-      method: 'POST',
+  async signup(
+    email: string,
+    password: string,
+    name?: string
+  ): Promise<AuthResponse> {
+    const response = await this.fetchAPI("/api/auth/signup", {
+      method: "POST",
       body: JSON.stringify({ email, password, name }),
     });
 
     const data: AuthResponse = await response.json();
-    localStorage.setItem('auth_token', data.access_token);
-    localStorage.setItem('user', JSON.stringify(data.user));
+    localStorage.setItem("auth_token", data.access_token);
+    localStorage.setItem("user", JSON.stringify(data.user));
     return data;
   }
 
   async login(email: string, password: string): Promise<AuthResponse> {
-    const response = await this.fetchAPI('/api/auth/login', {
-      method: 'POST',
+    const response = await this.fetchAPI("/api/auth/login", {
+      method: "POST",
       body: JSON.stringify({ email, password }),
     });
 
     const data: AuthResponse = await response.json();
-    localStorage.setItem('auth_token', data.access_token);
-    localStorage.setItem('user', JSON.stringify(data.user));
+    localStorage.setItem("auth_token", data.access_token);
+    localStorage.setItem("user", JSON.stringify(data.user));
     return data;
   }
 
   async getCurrentUser(): Promise<User> {
-    const response = await this.fetchAPI('/api/auth/me');
+    const response = await this.fetchAPI("/api/auth/me");
     const user: User = await response.json();
-    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem("user", JSON.stringify(user));
     return user;
   }
 
   logout(): void {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user');
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("user");
   }
 
   getStoredUser(): User | null {
-    const userStr = localStorage.getItem('user');
+    const userStr = localStorage.getItem("user");
     return userStr ? JSON.parse(userStr) : null;
   }
 
   isAuthenticated(): boolean {
-    return !!localStorage.getItem('auth_token');
+    return !!localStorage.getItem("auth_token");
   }
 
   // Project methods
   async listProjects(): Promise<Project[]> {
-    const response = await this.fetchAPI('/api/projects');
+    const response = await this.fetchAPI("/api/projects");
     const data = await response.json();
     return data.projects;
   }
 
   async createProject(name: string, description?: string): Promise<Project> {
-    const response = await this.fetchAPI('/api/projects', {
-      method: 'POST',
+    const response = await this.fetchAPI("/api/projects", {
+      method: "POST",
       body: JSON.stringify({ name, description }),
     });
     return response.json();
@@ -166,9 +182,13 @@ class APIService {
     return response.json();
   }
 
-  async updateProject(projectId: number, name?: string, description?: string): Promise<Project> {
+  async updateProject(
+    projectId: number,
+    name?: string,
+    description?: string
+  ): Promise<Project> {
     const response = await this.fetchAPI(`/api/projects/${projectId}`, {
-      method: 'PUT',
+      method: "PUT",
       body: JSON.stringify({ name, description }),
     });
     return response.json();
@@ -176,32 +196,44 @@ class APIService {
 
   async deleteProject(projectId: number): Promise<void> {
     await this.fetchAPI(`/api/projects/${projectId}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
   }
 
   // Document methods
-  async getDocument(projectId: number): Promise<{ content: string; updated_at: string }> {
+  async getDocument(
+    projectId: number
+  ): Promise<{ content: string; updated_at: string }> {
     const response = await this.fetchAPI(`/api/projects/${projectId}/document`);
     return response.json();
   }
 
-  async updateDocument(projectId: number, content: string): Promise<{ content: string; updated_at: string }> {
-    const response = await this.fetchAPI(`/api/projects/${projectId}/document`, {
-      method: 'PUT',
-      body: JSON.stringify({ content }),
-    });
+  async updateDocument(
+    projectId: number,
+    content: string
+  ): Promise<{ content: string; updated_at: string }> {
+    const response = await this.fetchAPI(
+      `/api/projects/${projectId}/document`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ content }),
+      }
+    );
     return response.json();
   }
 
   async getModels(): Promise<Model[]> {
     try {
-      const response = await this.fetchAPI('/api/models');
+      const response = await this.fetchAPI("/api/models");
       const data = await response.json();
-      console.log('[Membrane] Models loaded:', data.models?.length || 0);
+      console.log("[Membrane] Models loaded:", data.models?.length || 0);
       return data.models;
     } catch (error) {
-      console.error('[Membrane] Failed to load models from', API_BASE_URL, error);
+      console.error(
+        "[Membrane] Failed to load models from",
+        API_BASE_URL,
+        error
+      );
       throw error;
     }
   }
@@ -215,21 +247,24 @@ class APIService {
     model: string;
     projectId: number;
   }): AsyncGenerator<string> {
-    const response = await fetch(`${API_BASE_URL}/api/projects/${params.projectId}/chat/stream`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.getAuthHeaders(),
-      },
-      body: JSON.stringify({
-        message: params.message,
-        document_content: params.documentContent,
-        selected_text: params.selectedText,
-        purpose: params.purpose,
-        partner: params.partner,
-        model: params.model,
-      }),
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/api/projects/${params.projectId}/chat/stream`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...this.getAuthHeaders(),
+        },
+        body: JSON.stringify({
+          message: params.message,
+          document_content: params.documentContent,
+          selected_text: params.selectedText,
+          purpose: params.purpose,
+          partner: params.partner,
+          model: params.model,
+        }),
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`Stream error: ${response.statusText}`);
@@ -239,7 +274,7 @@ class APIService {
     const decoder = new TextDecoder();
 
     if (!reader) {
-      throw new Error('No reader available');
+      throw new Error("No reader available");
     }
 
     while (true) {
@@ -247,12 +282,12 @@ class APIService {
       if (done) break;
 
       const chunk = decoder.decode(value);
-      const lines = chunk.split('\n');
+      const lines = chunk.split("\n");
 
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
+        if (line.startsWith("data: ")) {
           const data = line.slice(6);
-          if (data === '[DONE]') {
+          if (data === "[DONE]") {
             return;
           }
           try {
@@ -275,15 +310,18 @@ class APIService {
     model: string;
     projectId: number;
   }): Promise<string> {
-    const response = await this.fetchAPI(`/api/projects/${params.projectId}/ghost-suggest`, {
-      method: 'POST',
-      body: JSON.stringify({
-        text: params.text,
-        cursor_position: params.cursorPosition,
-        purpose: params.purpose,
-        model: params.model,
-      }),
-    });
+    const response = await this.fetchAPI(
+      `/api/projects/${params.projectId}/ghost-suggest`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          text: params.text,
+          cursor_position: params.cursorPosition,
+          purpose: params.purpose,
+          model: params.model,
+        }),
+      }
+    );
 
     const data = await response.json();
     return data.suggestion;
@@ -291,35 +329,49 @@ class APIService {
 
   async addMemory(projectId: number, content: string): Promise<void> {
     await this.fetchAPI(`/api/projects/${projectId}/memory/add`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify({
         content: content,
       }),
     });
   }
 
-  async searchMemory(projectId: number, query: string, topK: number = 5): Promise<string[]> {
-    const response = await this.fetchAPI(`/api/projects/${projectId}/memory/search`, {
-      method: 'POST',
-      body: JSON.stringify({
-        query: query,
-        top_k: topK,
-      }),
-    });
+  async searchMemory(
+    projectId: number,
+    query: string,
+    topK: number = 5
+  ): Promise<string[]> {
+    const response = await this.fetchAPI(
+      `/api/projects/${projectId}/memory/search`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          query: query,
+          top_k: topK,
+        }),
+      }
+    );
 
     const data = await response.json();
     return data.results;
   }
 
-  async uploadFile(projectId: number, file: File, train: boolean = true): Promise<any> {
+  async uploadFile(
+    projectId: number,
+    file: File,
+    train: boolean = true
+  ): Promise<any> {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append("file", file);
 
-    const response = await fetch(`${API_BASE_URL}/api/projects/${projectId}/upload/file?train=${train}`, {
-      method: 'POST',
-      headers: this.getAuthHeaders(),
-      body: formData,
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/api/projects/${projectId}/upload/file?train=${train}`,
+      {
+        method: "POST",
+        headers: this.getAuthHeaders(),
+        body: formData,
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`Upload error: ${response.statusText}`);
@@ -329,37 +381,42 @@ class APIService {
   }
 
   async listFiles(projectId: number): Promise<any[]> {
-    const response = await this.fetchAPI(`/api/projects/${projectId}/upload/list`);
+    const response = await this.fetchAPI(
+      `/api/projects/${projectId}/upload/list`
+    );
     const data = await response.json();
     return data.files;
   }
 
   async deleteFile(projectId: number, fileId: number): Promise<void> {
     await this.fetchAPI(`/api/projects/${projectId}/upload/file/${fileId}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
   }
 
   async healthCheck(): Promise<boolean> {
     try {
-      const response = await this.fetchAPI('/health');
+      const response = await this.fetchAPI("/health");
       const data = await response.json();
-      return data.status === 'healthy';
+      return data.status === "healthy";
     } catch {
       return false;
     }
   }
 
   // ==================== STORY ENGINE API ====================
-  
+
   async getStories(): Promise<{ stories: any[] }> {
-    const response = await this.fetchAPI('/api/stories');
+    const response = await this.fetchAPI("/api/stories");
     return response.json();
   }
 
-  async createStory(data: { title: string; description?: string }): Promise<{ story: any }> {
-    const response = await this.fetchAPI('/api/stories', {
-      method: 'POST',
+  async createStory(data: {
+    title: string;
+    description?: string;
+  }): Promise<{ story: any }> {
+    const response = await this.fetchAPI("/api/stories", {
+      method: "POST",
       body: JSON.stringify(data),
     });
     return response.json();
@@ -370,9 +427,12 @@ class APIService {
     return response.json();
   }
 
-  async updateStory(storyId: number, data: { title?: string; description?: string; content?: string }): Promise<{ story: any }> {
+  async updateStory(
+    storyId: number,
+    data: { title?: string; description?: string; content?: string }
+  ): Promise<{ story: any }> {
     const response = await this.fetchAPI(`/api/stories/${storyId}`, {
-      method: 'PUT',
+      method: "PUT",
       body: JSON.stringify(data),
     });
     return response.json();
@@ -380,29 +440,38 @@ class APIService {
 
   async deleteStory(storyId: number): Promise<void> {
     await this.fetchAPI(`/api/stories/${storyId}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
   }
 
-  async createChapter(storyId: number, data: { title?: string; text?: string }): Promise<{ chapter: any }> {
+  async createChapter(
+    storyId: number,
+    data: { title?: string; text?: string }
+  ): Promise<{ chapter: any }> {
     const response = await this.fetchAPI(`/api/stories/${storyId}/chapters`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(data),
     });
     return response.json();
   }
 
-  async updateChapter(chapterId: number, data: { title?: string; text?: string; summary?: string }): Promise<{ chapter: any }> {
+  async updateChapter(
+    chapterId: number,
+    data: { title?: string; text?: string; summary?: string }
+  ): Promise<{ chapter: any }> {
     const response = await this.fetchAPI(`/api/chapters/${chapterId}`, {
-      method: 'PUT',
+      method: "PUT",
       body: JSON.stringify(data),
     });
     return response.json();
   }
 
-  async createCharacter(storyId: number, data: { name: string; traits?: string; backstory?: string }): Promise<{ character: any }> {
+  async createCharacter(
+    storyId: number,
+    data: { name: string; traits?: string; backstory?: string }
+  ): Promise<{ character: any }> {
     const response = await this.fetchAPI(`/api/stories/${storyId}/characters`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(data),
     });
     return response.json();
@@ -413,9 +482,12 @@ class APIService {
     return response.json();
   }
 
-  async createBeat(chapterId: number, data: { description: string; order?: number }): Promise<{ beat: any }> {
+  async createBeat(
+    chapterId: number,
+    data: { description: string; order?: number }
+  ): Promise<{ beat: any }> {
     const response = await this.fetchAPI(`/api/chapters/${chapterId}/beats`, {
-      method: 'POST',
+      method: "POST",
       body: JSON.stringify(data),
     });
     return response.json();
@@ -426,106 +498,153 @@ class APIService {
     return response.json();
   }
 
-  async createWorldElement(chapterId: number, data: { category: string; description: string }): Promise<{ element: any }> {
-    const response = await this.fetchAPI(`/api/chapters/${chapterId}/worldbuilding`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+  async createWorldElement(
+    chapterId: number,
+    data: { category: string; description: string }
+  ): Promise<{ element: any }> {
+    const response = await this.fetchAPI(
+      `/api/chapters/${chapterId}/worldbuilding`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    );
     return response.json();
   }
 
   async getWorldElements(chapterId: number): Promise<{ elements: any[] }> {
-    const response = await this.fetchAPI(`/api/chapters/${chapterId}/worldbuilding`);
+    const response = await this.fetchAPI(
+      `/api/chapters/${chapterId}/worldbuilding`
+    );
     return response.json();
   }
 
-  async createKeyEvent(chapterId: number, data: { description: string; order?: number }): Promise<{ event: any }> {
-    const response = await this.fetchAPI(`/api/chapters/${chapterId}/keyevents`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+  async createKeyEvent(
+    chapterId: number,
+    data: { description: string; order?: number }
+  ): Promise<{ event: any }> {
+    const response = await this.fetchAPI(
+      `/api/chapters/${chapterId}/keyevents`,
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    );
     return response.json();
   }
 
   async getKeyEvents(chapterId: number): Promise<{ events: any[] }> {
-    const response = await this.fetchAPI(`/api/chapters/${chapterId}/keyevents`);
+    const response = await this.fetchAPI(
+      `/api/chapters/${chapterId}/keyevents`
+    );
     return response.json();
   }
 
-  async generateStoryContent(data: { context: string; type: string; category?: string }): Promise<ReadableStream> {
+  async generateStoryContent(data: {
+    context: string;
+    type: string;
+    category?: string;
+  }): Promise<ReadableStream> {
     const response = await fetch(`${API_BASE_URL}/api/stories/generate`, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...this.getAuthHeaders(),
       },
       body: JSON.stringify(data),
     });
 
     if (!response.ok || !response.body) {
-      throw new Error('Failed to generate content');
+      throw new Error("Failed to generate content");
     }
 
     return response.body;
   }
 
-  async updateCharacter(storyId: number, charId: number, data: { name?: string; traits?: string; backstory?: string }): Promise<{ character: any }> {
-    const response = await this.fetchAPI(`/api/stories/${storyId}/characters/${charId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
+  async updateCharacter(
+    storyId: number,
+    charId: number,
+    data: { name?: string; traits?: string; backstory?: string }
+  ): Promise<{ character: any }> {
+    const response = await this.fetchAPI(
+      `/api/stories/${storyId}/characters/${charId}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }
+    );
     return response.json();
   }
 
   async deleteCharacter(storyId: number, charId: number): Promise<void> {
     await this.fetchAPI(`/api/stories/${storyId}/characters/${charId}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
   }
 
-  async updateBeat(chapterId: number, beatId: number, data: { description?: string; order?: number }): Promise<{ beat: any }> {
-    const response = await this.fetchAPI(`/api/chapters/${chapterId}/beats/${beatId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
+  async updateBeat(
+    chapterId: number,
+    beatId: number,
+    data: { description?: string; order?: number }
+  ): Promise<{ beat: any }> {
+    const response = await this.fetchAPI(
+      `/api/chapters/${chapterId}/beats/${beatId}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }
+    );
     return response.json();
   }
 
   async deleteBeat(chapterId: number, beatId: number): Promise<void> {
     await this.fetchAPI(`/api/chapters/${chapterId}/beats/${beatId}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
   }
 
-  async updateWorldElement(chapterId: number, elemId: number, data: { category?: string; description?: string }): Promise<{ element: any }> {
-    const response = await this.fetchAPI(`/api/chapters/${chapterId}/worldbuilding/${elemId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
+  async updateWorldElement(
+    chapterId: number,
+    elemId: number,
+    data: { category?: string; description?: string }
+  ): Promise<{ element: any }> {
+    const response = await this.fetchAPI(
+      `/api/chapters/${chapterId}/worldbuilding/${elemId}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }
+    );
     return response.json();
   }
 
   async deleteWorldElement(chapterId: number, elemId: number): Promise<void> {
     await this.fetchAPI(`/api/chapters/${chapterId}/worldbuilding/${elemId}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
   }
 
-  async updateKeyEvent(chapterId: number, eventId: number, data: { description?: string; order?: number }): Promise<{ event: any }> {
-    const response = await this.fetchAPI(`/api/chapters/${chapterId}/keyevents/${eventId}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
+  async updateKeyEvent(
+    chapterId: number,
+    eventId: number,
+    data: { description?: string; order?: number }
+  ): Promise<{ event: any }> {
+    const response = await this.fetchAPI(
+      `/api/chapters/${chapterId}/keyevents/${eventId}`,
+      {
+        method: "PUT",
+        body: JSON.stringify(data),
+      }
+    );
     return response.json();
   }
 
   async deleteKeyEvent(chapterId: number, eventId: number): Promise<void> {
     await this.fetchAPI(`/api/chapters/${chapterId}/keyevents/${eventId}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
   }
 }
 
 export const apiService = new APIService();
 export const api = apiService; // Alias for convenience
-
