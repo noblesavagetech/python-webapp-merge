@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { apiService, Model, API_BASE_URL } from '../../../services/api';
+import { apiService, Model } from '../../../services/api';
 import './ChatPanel.css';
 
 interface Message {

@@ -29,10 +29,7 @@ interface GhostSuggestion {
 
 function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel, projectId, partner: _partner }: DocumentEditorProps) {
   const [localContent, setLocalContent] = useState(content);
-  const [ghostSuggestion, setGhostSuggestion] = useState<GhostSuggestion | null>(null);
-  const [isComposing, setIsComposing] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
-  const ghostTimeoutRef = useRef<number | null>(null);
   const isUpdatingRef = useRef(false);
   
   // Revision state
@@ -59,41 +56,41 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
   }, [content, localContent]);
 
   // Generate ghost suggestion (disabled in revision mode for now)
-  const generateGhostSuggestion = useCallback(async (text: string, cursorPosition: number) => {
-    const textBeforeCursor = text.substring(0, cursorPosition);
-    const words = textBeforeCursor.split(/\s+/);
-    const contextWords = words.slice(-2000);
-    const contextText = contextWords.join(' ');
-    
-    const lastChar = textBeforeCursor[textBeforeCursor.length - 1];
-    if (lastChar && !/[\s.,;!?]/.test(lastChar)) {
-      return null;
-    }
-    
-    if (!projectId) {
-      return null;
-    }
-    
-    try {
-      const suggestion = await apiService.getGhostSuggestion({
-        text: contextText,
-        cursorPosition: contextText.length,
-        purpose,
-        model: selectedModel,
-        projectId,
-      });
-      
-      if (suggestion && suggestion.trim()) {
-        return {
-          text: suggestion,
-          position: cursorPosition,
-        };
-      }
-    } catch (error) {
-      console.error('Ghost suggestion error:', error);
-    }
-    return null;
-  }, [purpose, selectedModel, projectId]);
+  // const generateGhostSuggestion = useCallback(async (text: string, cursorPosition: number) => {
+  //   const textBeforeCursor = text.substring(0, cursorPosition);
+  //   const words = textBeforeCursor.split(/\s+/);
+  //   const contextWords = words.slice(-2000);
+  //   const contextText = contextWords.join(' ');
+  //   
+  //   const lastChar = textBeforeCursor[textBeforeCursor.length - 1];
+  //   if (lastChar && !/[\s.,;!?]/.test(lastChar)) {
+  //     return null;
+  //   }
+  //   
+  //   if (!projectId) {
+  //     return null;
+  //   }
+  //   
+  //   try {
+  //     const suggestion = await apiService.getGhostSuggestion({
+  //       text: contextText,
+  //       cursorPosition: contextText.length,
+  //       purpose,
+  //       model: selectedModel,
+  //       projectId,
+  //     });
+  //     
+  //     if (suggestion && suggestion.trim()) {
+  //       return {
+  //         text: suggestion,
+  //         position: cursorPosition,
+  //       };
+  //     }
+  //   } catch (error) {
+  //     console.error('Ghost suggestion error:', error);
+  //   }
+  //   return null;
+  // }, [purpose, selectedModel, projectId]);
 
   // Build HTML string for contenteditable with inline revisions
   const buildEditorHTML = useCallback(() => {
