@@ -1,5 +1,4 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { apiService } from '../../../services/api';
 import { 
   DocumentWithRevisions, 
   createRevision, 
@@ -22,12 +21,7 @@ interface DocumentEditorProps {
   projectId: number | null;
 }
 
-interface GhostSuggestion {
-  text: string;
-  position: number;
-}
-
-function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel, projectId, partner: _partner }: DocumentEditorProps) {
+function DocumentEditor({ content, onChange, onSelection, purpose: _purpose, selectedModel: _selectedModel, projectId: _projectId, partner: _partner }: DocumentEditorProps) {
   const [localContent, setLocalContent] = useState(content);
   const editorRef = useRef<HTMLDivElement>(null);
   const isUpdatingRef = useRef(false);
