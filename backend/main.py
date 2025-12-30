@@ -929,27 +929,22 @@ async def summarize_chapter(
         raise HTTPException(status_code=403, detail="Access denied")
     
     # Default summarization prompt
-    default_prompt = """Provide a fluid, narrative-style summary that captures the essence of the text passage. Write as if you're quickly briefing a writer about the key events, ensuring:
+    default_prompt = """Summarize the provided text passage:
 
-- Maintain a storyteller's flow
-- Use natural, conversational language
-- Preserve the original passage's momentum
-- Capture the sequence of events seamlessly
-- Focus on clear, connected storytelling
+REQUIREMENTS:
+- Maximum length: 5 paragraphs
+- Strictly based on the input text
+- Chronological order of events
+- Past tense narrative
+- Focus on direct observations
+- Include only information present in the source text
 
-Prioritize:
-- Chronological progression of events
-- Character actions and interactions
-- Specific plot developments
-- Contextual details that drive the narrative forward
-
-Avoid:
-- Fragmented lists
-- Dry, disconnected reporting
-- Unnecessary commentary
-- Breaking the narrative rhythm
-
-Aim for a concise, engaging summary that reads like a quick verbal recap to a colleague, making the core events immediately clear and compelling."""
+CRITICAL GUIDELINES:
+- Every detail must be directly traceable to the original passage
+- No external information or speculation
+- Capture the most significant events and interactions
+- Maintain a clear, factual tone
+- Ensure comprehensive coverage within the paragraph limit"""
     
     prompt = request.prompt if request.prompt else default_prompt
     
