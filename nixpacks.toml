@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["python311", "python311Packages.pip", "nodejs_20"]
+nixPkgs = ["python311", "python311Packages.pip", "nodejs_20", "stdenv.cc.cc.lib"]
 
 [phases.install]
 cmds = [
@@ -13,4 +13,4 @@ cmds = [
 ]
 
 [start]
-cmd = "cd backend && python3.11 -m uvicorn main:app --host 0.0.0.0 --port $PORT"
+cmd = "cd backend && LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/nix/store/*-gcc-*/lib python3.11 -m uvicorn main:app --host 0.0.0.0 --port $PORT"
