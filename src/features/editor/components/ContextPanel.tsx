@@ -90,7 +90,7 @@ function ContextPanel({ memories, onRemoveMemory, projectId }: ContextPanelProps
     }
   };
 
-  const handleVerifyFile = async (fileId: number, filename: string) => {
+  const handleVerifyFile = async (filename: string) => {
     if (!projectId) return;
     try {
       // Query vector store for file content
@@ -220,7 +220,7 @@ function ContextPanel({ memories, onRemoveMemory, projectId }: ContextPanelProps
                     <div className="file-actions">
                       <button 
                         className="file-verify"
-                        onClick={() => handleVerifyFile(file.id, file.filename)}
+                        onClick={() => handleVerifyFile(file.filename)}
                         title="Verify file in vector store"
                       >
                         🔍
