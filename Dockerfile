@@ -36,5 +36,5 @@ COPY --from=frontend-builder /app/dist ./dist
 # Expose port
 EXPOSE 8000
 
-# Start command
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--app-dir", "backend"]
+# Start command - use Railway's PORT env variable
+CMD python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --app-dir backend
