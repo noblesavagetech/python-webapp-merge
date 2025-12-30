@@ -145,6 +145,42 @@
   background: var(--color-accent-hover, #7c3aed);
 }
 
+.btn-save-summary {
+  background: var(--color-accent-secondary, #6366f1);
+  color: white;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  width: 100%;
+}
+
+.btn-save-summary:hover {
+  background: var(--color-accent-secondary-hover, #4f46e5);
+}
+
+.save-message {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.save-message.success {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid var(--color-success, #10b981);
+  color: var(--color-success, #10b981);
+}
+
+.save-message.error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--color-error, #ef4444);
+  color: var(--color-error, #ef4444);
+}
+
 .btn-summarize {
   background: var(--color-info, #3b82f6);
   color: white;

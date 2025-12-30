@@ -107,6 +107,7 @@ export function StoryEditor() {
 
   // Chapter Summarization
   const [summarizing, setSummarizing] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
 
   const storyIdNum = id ? parseInt(id, 10) : null;
 
@@ -172,11 +173,29 @@ export function StoryEditor() {
     try {
       await api.updateChapter(currentChapter.id, {
         title,
-        summary,
         text,
       });
+      setSaveMessage("✓ Chapter saved successfully!");
+      setTimeout(() => setSaveMessage(""), 3000);
     } catch (error) {
       console.error("Failed to save:", error);
+      setSaveMessage("✗ Error saving chapter");
+      setTimeout(() => setSaveMessage(""), 3000);
+    }
+  };
+
+  const handleSaveSummary = async () => {
+    if (!storyIdNum || !currentChapter) return;
+    try {
+      await api.updateChapter(currentChapter.id, {
+        summary,
+      });
+      setSaveMessage("✓ Summary saved successfully!");
+      setTimeout(() => setSaveMessage(""), 3000);
+    } catch (error) {
+      console.error("Failed to save summary:", error);
+      setSaveMessage("✗ Error saving summary");
+      setTimeout(() => setSaveMessage(""), 3000);
     }
   };
 
@@ -622,6 +641,14 @@ export function StoryEditor() {
             value={summary}
             onChange={(e) => setSummary(e.target.value)}
           />
+          <button
+            type="button"
+            className="btn-save-summary"
+            onClick={handleSaveSummary}
+            style={{ marginTop: "0.5rem", marginBottom: "1rem" }}
+          >
+            Save Summary
+          </button>
 
           <label className="form-label">Chapter Text:</label>
           <textarea
@@ -645,6 +672,15 @@ export function StoryEditor() {
           <button type="submit" className="btn-save">
             Save Chapter
           </button>
+          {saveMessage && (
+            <div
+              className={`save-message ${
+                saveMessage.includes("✓") ? "success" : "error"
+              }`}
+            >
+              {saveMessage}
+            </div>
+          )}
         </form>
 
         {/* Two-Column AI Generators */}
