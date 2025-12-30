@@ -196,6 +196,10 @@ class AIGenerateRequest(BaseModel):
     type: str  # 'summary', 'character', 'plot', 'beats', 'worldbuilding'
     category: Optional[str] = None  # For world-building
 
+class ChapterSummarizeRequest(BaseModel):
+    text: str
+    prompt: Optional[str] = None
+
 # Authentication Endpoints
 @app.post("/api/auth/signup", response_model=AuthResponse)
 async def signup(request: SignupRequest, db: Session = Depends(get_db)):
@@ -906,6 +910,63 @@ async def update_chapter(
             "summary": updated_chapter.summary
         }
     }
+
+@app.post("/api/chapters/{chapter_id}/summarize")
+async def summarize_chapter(
+    chapter_id: int,
+    request: ChapterSummarizeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Summarize chapter text using Gemini"""
+    chapter = story_service.get_chapter(db, chapter_id)
+    if not chapter:
+        raise HTTPException(status_code=404, detail="Chapter not found")
+    
+    # Verify ownership through story
+    story = story_service.get_story(db, chapter.story_id, current_user.id)
+    if not story:
+        raise HTTPException(status_code=403, detail="Access denied")
+    
+    # Default summarization prompt
+    default_prompt = """Summarize the given text passage by answering these ONLY:
+
+WHAT HAPPENED:
+- Describe the key events in clear, chronological order
+- Use simple, direct language
+- Focus on the most important actions and developments
+
+WHO WAS INVOLVED:
+- List the characters mentioned
+- Briefly state their basic role in this specific passage
+- Only describe what is DIRECTLY observable in the text
+
+KEY DETAILS:
+- Location of the events
+- Specific actions taken by characters
+- Any direct dialogue or interactions that drive the plot forward
+
+CRITICAL INFORMATION:
+- Highlight any significant plot developments
+- Note any clear conflicts or challenges characters encounter
+- Stick to EXACTLY what is in the text - NO speculation
+
+SUMMARY GUIDELINES:
+- Maximum length: 250 words
+- Use short, clear sentences
+- Avoid interpretation or analysis
+- Report ONLY what is explicitly stated or shown"""
+    
+    prompt = request.prompt if request.prompt else default_prompt
+    
+    # Use Gemini for summarization
+    summary = await openrouter.summarize_text(
+        text=request.text,
+        prompt=prompt,
+        model="google/gemini-2.5-flash"
+    )
+    
+    return {"summary": summary}
 
 # Character routes
 @app.post("/api/stories/{story_id}/characters")

@@ -149,3 +149,48 @@ class OpenRouterService:
                     return ""
                 return " " + suggestion  # Add leading space
             return ""
+    
+    async def summarize_text(
+        self,
+        text: str,
+        prompt: str,
+        model: str = "google/gemini-2.5-flash"
+    ) -> str:
+        """Summarize text using specified model and prompt"""
+        
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://membrane.app",
+            "X-Title": "The Membrane"
+        }
+        
+        payload = {
+            "model": model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": prompt
+                },
+                {
+                    "role": "user",
+                    "content": text
+                }
+            ],
+            "stream": False,
+            "temperature": 0.3,
+            "max_tokens": 1000
+        }
+        
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{self.base_url}/chat/completions",
+                headers=headers,
+                json=payload
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            if "choices" in data and len(data["choices"]) > 0:
+                return data["choices"][0]["message"]["content"].strip()
+            return ""

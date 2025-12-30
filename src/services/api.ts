@@ -644,6 +644,21 @@ class APIService {
       method: "DELETE",
     });
   }
+
+  async summarizeChapter(
+    chapterId: number,
+    text: string,
+    prompt?: string
+  ): Promise<{ summary: string }> {
+    const response = await this.fetchAPI(
+      `/api/chapters/${chapterId}/summarize`,
+      {
+        method: "POST",
+        body: JSON.stringify({ text, prompt }),
+      }
+    );
+    return response.json();
+  }
 }
 
 export const apiService = new APIService();

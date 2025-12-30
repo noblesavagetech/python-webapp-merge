@@ -105,6 +105,9 @@ export function StoryEditor() {
   const [proseModel, setProseModel] = useState("anthropic/claude-3.5-sonnet");
   const [beatModel, setBeatModel] = useState("anthropic/claude-3.5-sonnet");
 
+  // Chapter Summarization
+  const [summarizing, setSummarizing] = useState(false);
+
   const storyIdNum = id ? parseInt(id, 10) : null;
 
   useEffect(() => {
@@ -542,6 +545,21 @@ export function StoryEditor() {
     }
   };
 
+  const handleSummarizeChapter = async () => {
+    if (!text.trim() || !currentChapter) return;
+    setSummarizing(true);
+
+    try {
+      const response = await api.summarizeChapter(currentChapter.id, text);
+      setSummary(response.summary);
+    } catch (error) {
+      console.error("Failed to summarize chapter:", error);
+      alert("Error summarizing chapter. Please try again.");
+    } finally {
+      setSummarizing(false);
+    }
+  };
+
   if (loading) {
     return <div className="loading-screen">Loading story...</div>;
   }
@@ -613,6 +631,16 @@ export function StoryEditor() {
             onChange={(e) => setText(e.target.value)}
             placeholder="Start writing your story..."
           />
+
+          <button
+            type="button"
+            className="btn-summarize"
+            onClick={handleSummarizeChapter}
+            disabled={summarizing || !text.trim()}
+            style={{ marginBottom: "1rem" }}
+          >
+            {summarizing ? "Summarizing..." : "Summarize Chapter Text"}
+          </button>
 
           <button type="submit" className="btn-save">
             Save Chapter

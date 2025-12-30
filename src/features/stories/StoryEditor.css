@@ -145,6 +145,28 @@
   background: var(--color-accent-hover, #7c3aed);
 }
 
+.btn-summarize {
+  background: var(--color-info, #3b82f6);
+  color: white;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  width: 100%;
+}
+
+.btn-summarize:hover:not(:disabled) {
+  background: var(--color-info-hover, #2563eb);
+}
+
+.btn-summarize:disabled {
+  background: var(--color-disabled, #4b5563);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .ai-generators-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
