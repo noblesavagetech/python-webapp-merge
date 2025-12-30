@@ -11,7 +11,6 @@ import json
 from pathlib import Path
 
 from services.openrouter_service import OpenRouterService
-from services.vector_service import VectorService
 from services.file_service import FileService
 from services.database_service import get_db, init_db
 from services.auth_service import (
@@ -22,6 +21,15 @@ from services.auth_service import (
 )
 from services.story_service import StoryService
 from models import User, Project, Document, ChatMessage, FileUpload, Story, Chapter, Character, BeatScene, WorldBuildingElement, KeyEvent
+
+# Lazy import for vector service to avoid chromadb dependency issues
+try:
+    from services.vector_service import VectorService
+    VECTOR_SERVICE_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: VectorService not available: {e}")
+    VectorService = None
+    VECTOR_SERVICE_AVAILABLE = False
 
 load_dotenv()
 
@@ -52,14 +60,16 @@ openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
 openrouter = OpenRouterService(api_key=openrouter_api_key)
 
 # Try to initialize vector service, but make it optional
-try:
-    vector_service = VectorService(
-        db_dir=os.getenv("VECTOR_DB_DIR", "./data/vectordb"),
-        openrouter_api_key=openrouter_api_key
-    )
-except Exception as e:
-    print(f"Warning: Could not initialize VectorService: {e}")
-    vector_service = None
+vector_service = None
+if VECTOR_SERVICE_AVAILABLE:
+    try:
+        vector_service = VectorService(
+            db_dir=os.getenv("VECTOR_DB_DIR", "./data/vectordb"),
+            openrouter_api_key=openrouter_api_key
+        )
+        print("VectorService initialized successfully")
+    except Exception as e:
+        print(f"Warning: Could not initialize VectorService: {e}")
 
 file_service = FileService(upload_dir=os.getenv("UPLOAD_DIR", "./data/uploads"))
 story_service = StoryService(openrouter_api_key=openrouter_api_key)
