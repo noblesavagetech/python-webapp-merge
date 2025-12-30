@@ -929,33 +929,27 @@ async def summarize_chapter(
         raise HTTPException(status_code=403, detail="Access denied")
     
     # Default summarization prompt
-    default_prompt = """Summarize the given text passage by answering these ONLY:
+    default_prompt = """Provide a fluid, narrative-style summary that captures the essence of the text passage. Write as if you're quickly briefing a writer about the key events, ensuring:
 
-WHAT HAPPENED:
-- Describe the key events in clear, chronological order
-- Use simple, direct language
-- Focus on the most important actions and developments
+- Maintain a storyteller's flow
+- Use natural, conversational language
+- Preserve the original passage's momentum
+- Capture the sequence of events seamlessly
+- Focus on clear, connected storytelling
 
-WHO WAS INVOLVED:
-- List the characters mentioned
-- Briefly state their basic role in this specific passage
-- Only describe what is DIRECTLY observable in the text
+Prioritize:
+- Chronological progression of events
+- Character actions and interactions
+- Specific plot developments
+- Contextual details that drive the narrative forward
 
-KEY DETAILS:
-- Location of the events
-- Specific actions taken by characters
-- Any direct dialogue or interactions that drive the plot forward
+Avoid:
+- Fragmented lists
+- Dry, disconnected reporting
+- Unnecessary commentary
+- Breaking the narrative rhythm
 
-CRITICAL INFORMATION:
-- Highlight any significant plot developments
-- Note any clear conflicts or challenges characters encounter
-- Stick to EXACTLY what is in the text - NO speculation
-
-SUMMARY GUIDELINES:
-- Maximum length: 250 words
-- Use short, clear sentences
-- Avoid interpretation or analysis
-- Report ONLY what is explicitly stated or shown"""
+Aim for a concise, engaging summary that reads like a quick verbal recap to a colleague, making the core events immediately clear and compelling."""
     
     prompt = request.prompt if request.prompt else default_prompt
     
