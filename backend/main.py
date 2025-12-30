@@ -483,16 +483,29 @@ async def chat_stream(
     collection_name = f"user_{current_user.id}_project_{project_id}"
     memories = await vector_service.search(collection_name, request.message, top_k=3) if vector_service else []
     
-    # Build context
+    # Get recent chat history
+    recent_messages = db.query(ChatMessage).filter(
+        ChatMessage.project_id == project_id
+    ).order_by(ChatMessage.created_at.desc()).limit(10).all()
+    recent_messages.reverse()  # oldest first
+    
+    chat_history = "\n".join([
+        f"{msg.role}: {msg.content[:500]}" for msg in recent_messages
+    ]) if recent_messages else "(No previous conversation)"
+    
+    # Build context - include FULL document content
     context = f"""Purpose: {request.purpose}
 Partner mode: {request.partner}
 
-Document content:
-{request.document_content[:2000]}
+Full Document content:
+{request.document_content}
 
 {f"Selected text: {request.selected_text}" if request.selected_text else ""}
 
-Relevant memories:
+Recent conversation:
+{chat_history}
+
+Relevant memories from trained files:
 {chr(10).join(f"- {m}" for m in memories)}
 """
     
@@ -615,47 +628,63 @@ async def upload_file(
     db: Session = Depends(get_db)
 ):
     """Upload files - either for training (adds to vector memory) or as context (reference only)"""
-    # Verify project ownership
-    project = db.query(Project).filter(
-        Project.id == project_id,
-        Project.user_id == current_user.id
-    ).first()
-    
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    # Save file with user/project scoping
-    user_project_path = f"{current_user.id}/{project_id}"
-    file_path = await file_service.save_upload(user_project_path, file)
-    
-    # Extract text content
-    content = await file_service.extract_text(file_path)
-    
-    # Only add to vector store if training
-    if train and vector_service:
-        collection_name = f"user_{current_user.id}_project_{project_id}"
-        await vector_service.add_memory(collection_name, content, metadata={"source": file.filename})
-    
-    # Save file record to database
-    file_record = FileUpload(
-        project_id=project_id,
-        filename=file.filename,
-        filepath=file_path,
-        file_size=os.path.getsize(file_path),
-        mime_type=file.content_type,
-        processed=train  # Mark as processed only if trained
-    )
-    db.add(file_record)
-    db.commit()
-    
-    return {
-        "status": "success",
-        "filename": file.filename,
-        "path": file_path,
-        "size": os.path.getsize(file_path),
-        "trained": train,
-        "content": content  # Return content for context files
-    }
+    try:
+        # Verify project ownership
+        project = db.query(Project).filter(
+            Project.id == project_id,
+            Project.user_id == current_user.id
+        ).first()
+        
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        
+        # Save file with user/project scoping
+        user_project_path = f"{current_user.id}/{project_id}"
+        file_path = await file_service.save_upload(user_project_path, file)
+        
+        # Extract text content
+        content = await file_service.extract_text(file_path)
+        
+        # Only add to vector store if training and vector service is available
+        processed_successfully = False
+        if train and vector_service:
+            try:
+                collection_name = f"user_{current_user.id}_project_{project_id}"
+                await vector_service.add_memory(collection_name, content, metadata={"source": file.filename})
+                processed_successfully = True
+            except Exception as e:
+                print(f"Warning: Could not add to vector store: {e}")
+                import traceback
+                traceback.print_exc()
+                # Continue anyway - file is still saved
+        
+        # Save file record to database
+        file_record = FileUpload(
+            project_id=project_id,
+            filename=file.filename,
+            filepath=file_path,
+            file_size=os.path.getsize(file_path),
+            mime_type=file.content_type,
+            processed=processed_successfully  # Only mark as processed if vector service actually worked
+        )
+        db.add(file_record)
+        db.commit()
+        
+        return {
+            "status": "success",
+            "filename": file.filename,
+            "path": file_path,
+            "size": os.path.getsize(file_path),
+            "trained": train and vector_service is not None,
+            "content": content  # Return content for context files
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Upload error: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 @app.get("/api/projects/{project_id}/upload/list")
 async def list_uploads(

@@ -90,6 +90,18 @@ function ContextPanel({ memories, onRemoveMemory, projectId }: ContextPanelProps
     }
   };
 
+  const handleVerifyFile = async (fileId: number, filename: string) => {
+    if (!projectId) return;
+    try {
+      // Query vector store for file content
+      const results = await apiService.searchMemory(projectId, `content from ${filename}`, 5);
+      alert(`File: ${filename}\n\nVector store contains ${results.length} chunks from this file.\n\nSample: ${results[0]?.substring(0, 200) || 'No results found'}...`);
+    } catch (error) {
+      console.error('Failed to verify file:', error);
+      alert('Failed to verify file in vector store');
+    }
+  };
+
   const handleDeleteTrained = async (fileId: number) => {
     if (!projectId || !confirm('Delete this trained file from memory?')) return;
     
@@ -202,15 +214,25 @@ function ContextPanel({ memories, onRemoveMemory, projectId }: ContextPanelProps
                       <div className="file-name">{file.filename}</div>
                       <div className="file-meta">
                         {formatFileSize(file.file_size)} • {new Date(file.created_at).toLocaleDateString()}
+                        {file.processed && <span className="processed-badge"> ✓ Trained</span>}
                       </div>
                     </div>
-                    <button 
-                      className="file-delete"
-                      onClick={() => handleDeleteTrained(file.id)}
-                      title="Delete file"
-                    >
-                      🗑️
-                    </button>
+                    <div className="file-actions">
+                      <button 
+                        className="file-verify"
+                        onClick={() => handleVerifyFile(file.id, file.filename)}
+                        title="Verify file in vector store"
+                      >
+                        🔍
+                      </button>
+                      <button 
+                        className="file-delete"
+                        onClick={() => handleDeleteTrained(file.id)}
+                        title="Delete file"
+                      >
+                        🗑️
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

@@ -97,14 +97,10 @@ function ChatPanel({
         timestamp: new Date().toISOString(),
       }]);
       
-      const words = documentContent.split(/\s+/);
-      const contextContent = words.length > 2000 
-        ? words.slice(-2000).join(' ')
-        : documentContent;
-      
+      // Send full document content (no truncation)
       for await (const chunk of apiService.streamChat({
         message: text,
-        documentContent: contextContent,
+        documentContent: documentContent,
         selectedText,
         purpose,
         partner,
