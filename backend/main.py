@@ -1517,14 +1517,17 @@ async def get_models():
 # Static files are mounted AFTER all API routes so API takes precedence
 static_dir = Path(__file__).parent.parent / "dist"
 if static_dir.exists():
-    app.mount("/assets", StaticFiles(directory=str(static_dir / "assets")), name="assets")
+    # Mount assets directory for static files (JS, CSS, images)
+    if (static_dir / "assets").exists():
+        app.mount("/assets", StaticFiles(directory=str(static_dir / "assets")), name="assets")
     
-    @app.get("/{full_path:path}")
+    # Catch-all route for SPA - must be last and must not match /api/* routes
+    @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str):
         """Serve the SPA for all non-API routes"""
-        # Don't serve API routes as static files
-        if full_path.startswith("api/"):
-            raise HTTPException(status_code=404, detail="Not found")
+        # API routes are handled by FastAPI routes defined above - don't intercept them
+        if full_path.startswith("api"):
+            raise HTTPException(status_code=404, detail="API endpoint not found")
         
         # Try to serve the requested file
         file_path = static_dir / full_path
@@ -1532,7 +1535,11 @@ if static_dir.exists():
             return FileResponse(file_path)
         
         # Fall back to index.html for SPA routing
-        return FileResponse(static_dir / "index.html")
+        index_path = static_dir / "index.html"
+        if index_path.is_file():
+            return FileResponse(index_path)
+        
+        raise HTTPException(status_code=404, detail="Not found")
 
 if __name__ == "__main__":
     import uvicorn
