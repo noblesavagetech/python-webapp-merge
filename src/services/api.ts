@@ -19,16 +19,13 @@ const getAPIBaseURL = () => {
     return `${protocol}//${newHostname}`;
   }
 
-  // Railway: if deployed on Railway, backend should be on a different service
-  // User needs to set VITE_API_URL in Railway environment variables
+  // Railway or other single-service deployment: use same origin
+  // If we're on a railway.app domain, assume backend serves from same origin
   if (
     hostname.includes(".railway.app") ||
     hostname.includes(".up.railway.app")
   ) {
-    console.error(
-      "Railway deployment detected. Please set VITE_API_URL environment variable to your backend URL"
-    );
-    return "BACKEND_URL_NOT_SET"; // Will cause visible error
+    return `${protocol}//${hostname}`;
   }
 
   // Local development

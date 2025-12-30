@@ -1,12 +1,14 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional, List
 from sqlalchemy.orm import Session
 import os
 from dotenv import load_dotenv
 import json
+from pathlib import Path
 
 from services.openrouter_service import OpenRouterService
 from services.vector_service import VectorService
@@ -1510,6 +1512,27 @@ async def get_models():
             }
         ]
     }
+
+# Mount static files for production deployment (serve frontend)
+# Static files are mounted AFTER all API routes so API takes precedence
+static_dir = Path(__file__).parent.parent / "dist"
+if static_dir.exists():
+    app.mount("/assets", StaticFiles(directory=str(static_dir / "assets")), name="assets")
+    
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """Serve the SPA for all non-API routes"""
+        # Don't serve API routes as static files
+        if full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not found")
+        
+        # Try to serve the requested file
+        file_path = static_dir / full_path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        
+        # Fall back to index.html for SPA routing
+        return FileResponse(static_dir / "index.html")
 
 if __name__ == "__main__":
     import uvicorn
