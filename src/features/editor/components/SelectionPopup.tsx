@@ -7,6 +7,7 @@ interface SelectionPopupProps {
   onSubmit: (instruction: string) => void;
   onClose: () => void;
   isLoading?: boolean;
+  editorRef?: React.RefObject<HTMLDivElement>;
 }
 
 export function SelectionPopup({ 
@@ -14,7 +15,8 @@ export function SelectionPopup({
   position, 
   onSubmit, 
   onClose,
-  isLoading = false 
+  isLoading = false,
+  editorRef
 }: SelectionPopupProps) {
   const [input, setInput] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -26,16 +28,20 @@ export function SelectionPopup({
   }, []);
 
   useEffect(() => {
-    // Close on outside click
+    // Close on outside click (but not on editor)
     const handleClickOutside = (e: MouseEvent) => {
-      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const clickedInPopup = popupRef.current?.contains(target);
+      const clickedInEditor = editorRef?.current?.contains(target);
+      
+      if (!clickedInPopup && !clickedInEditor) {
         onClose();
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [onClose]);
+  }, [onClose, editorRef]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

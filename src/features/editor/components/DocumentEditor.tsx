@@ -502,6 +502,7 @@ Instruction: ${instruction}`;
           onSubmit={handlePopupSubmit}
           onClose={handlePopupClose}
           isLoading={isGenerating}
+          editorRef={editorRef}
         />
       )}
     </div>
