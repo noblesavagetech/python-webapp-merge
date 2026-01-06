@@ -209,13 +209,31 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
     setRevisionDoc(updated);
     onChange(newContent);
     
-    // Update editor
+    // Update editor using the updated doc, not stale closure
     if (updated.revisions.length === 0) {
       editorRef.current.textContent = newContent;
     } else {
-      editorRef.current.innerHTML = buildEditorHTML();
+      const spans = buildTextSpans(updated.baseContent, updated.revisions);
+      editorRef.current.innerHTML = spans.map((span) => {
+        const escapedText = span.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        
+        if (span.type === 'deleted') {
+          return `<span class="text-span text-span--deleted" contenteditable="false">${escapedText}</span>`;
+        } else if (span.type === 'inserted') {
+          const revision = updated.revisions.find(r => r.newSpan?.id === span.id);
+          const buttons = revision 
+            ? `<span class="revision-actions" contenteditable="false">
+                 <button class="revision-action revision-action--accept" data-revision-id="${revision.id}" data-action="accept">✓</button>
+                 <button class="revision-action revision-action--reject" data-revision-id="${revision.id}" data-action="reject">✗</button>
+               </span>`
+            : '';
+          return `<span class="text-span text-span--inserted" contenteditable="false">${escapedText}${buttons}</span>`;
+        } else {
+          return escapedText;
+        }
+      }).join('');
     }
-  }, [revisionDoc, onChange, buildEditorHTML]);
+  }, [revisionDoc, onChange]);
   
   const handleRejectRevision = useCallback((revisionId: string) => {
     if (!editorRef.current) return;
@@ -228,13 +246,75 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
     
     setRevisionDoc(updated);
     
-    // Update editor
+    // Update editor using the updated doc, not stale closure
     if (updated.revisions.length === 0) {
       editorRef.current.textContent = revisionDoc.baseContent;
     } else {
-      editorRef.current.innerHTML = buildEditorHTML();
+      const spans = buildTextSpans(updated.baseContent, updated.revisions);
+      editorRef.current.innerHTML = spans.map((span) => {
+        const escapedText = span.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        
+        if (span.type === 'deleted') {
+          return `<span class="text-span text-span--deleted" contenteditable="false">${escapedText}</span>`;
+        } else if (span.type === 'inserted') {
+          const revision = updated.revisions.find(r => r.newSpan?.id === span.id);
+          const buttons = revision 
+            ? `<span class="revision-actions" contenteditable="false">
+                 <butt using updated doc
+    if (editorRef.current) {
+      if (updated.revisions.length === 0) {
+        editorRef.current.textContent = finalContent;
+      } else {
+        const spans = buildTextSpans(updated.baseContent, updated.revisions);
+        editorRef.current.innerHTML = spans.map((span) => {
+          const escapedText = span.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          
+          if (span.type === 'deleted') {
+            return `<s using updated doc
+    if (editorRef.current) {
+      if (updated.revisions.length === 0) {
+        editorRef.current.textContent = revisionDoc.baseContent;
+      } else {
+        const spans = buildTextSpans(updated.baseContent, updated.revisions);
+        editorRef.current.innerHTML = spans.map((span) => {
+          const escapedText = span.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          
+          if (span.type === 'deleted') {
+            return `<span class="text-span text-span--deleted" contenteditable="false">${escapedText}</span>`;
+          } else if (span.type === 'inserted') {
+            const revision = updated.revisions.find(r => r.newSpan?.id === span.id);
+            const buttons = revision 
+              ? `<span class="revision-actions" contenteditable="false">
+                   <button class="revision-action revision-action--accept" data-revision-id="${revision.id}" data-action="accept">✓</button>
+                   <button class="revision-action revision-action--reject" data-revision-id="${revision.id}" data-action="reject">✗</button>
+                 </span>`
+              : '';
+            return `<span class="text-span text-span--inserted" contenteditable="false">${escapedText}${buttons}</span>`;
+          } else {
+            return escapedText;
+          }
+        }).join('');
+      }
     }
-  }, [revisionDoc, buildEditorHTML]);
+  }, [revisionDocsion-actions" contenteditable="false">
+                   <button class="revision-action revision-action--accept" data-revision-id="${revision.id}" data-action="accept">✓</button>
+                   <button class="revision-action revision-action--reject" data-revision-id="${revision.id}" data-action="reject">✗</button>
+                 </span>`
+              : '';
+            return `<span class="text-span text-span--inserted" contenteditable="false">${escapedText}${buttons}</span>`;
+          } else {
+            return escapedText;
+          }
+        }).join('');
+      }
+    }
+  }, [revisionDoc, onChanget-span--inserted" contenteditable="false">${escapedText}${buttons}</span>`;
+        } else {
+          return escapedText;
+        }
+      }).join('');
+    }
+  }, [revisionDoc]);
   
   const handleAcceptAll = useCallback(() => {
     const updated = acceptAllRevisions(revisionDoc);
@@ -262,12 +342,12 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
   const applyRevision = useCallback((startPos: number, endPos: number, newText: string) => {
     if (!editorRef.current) return;
     
-    const content = editorRef.current.textContent || '';
-    const revision = createRevision(content, startPos, endPos, newText);
+    // Create revision using the CURRENT baseContent, not the editor's display content
+    const revision = createRevision(revisionDoc.baseContent, startPos, endPos, newText);
     
     const updatedDoc = {
       ...revisionDoc,
-      baseContent: content,
+      // NEVER modify baseContent when adding a revision - it stays unchanged!
       revisions: [...revisionDoc.revisions, revision],
       activeRevisionId: revision.id,
     };
