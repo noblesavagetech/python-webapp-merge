@@ -125,6 +125,12 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
     
     isUpdatingRef.current = true;
     
+    // Close popup when user starts typing
+    if (showPopup) {
+      setShowPopup(false);
+      setSelectedTextInfo(null);
+    }
+    
     // Only update base content if there are no pending revisions
     if (revisionDoc.revisions.length === 0) {
       setLocalContent(newText);
@@ -138,7 +144,7 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
     setTimeout(() => {
       isUpdatingRef.current = false;
     }, 100);
-  }, [revisionDoc.revisions.length, onChange]);
+  }, [revisionDoc.revisions.length, onChange, showPopup]);
 
   // Handle clicks on revision action buttons
   const handleEditorClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -304,7 +310,11 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
     setIsGenerating(true);
     
     try {
-      const fullMessage = `Selected text: \"${selectedTextInfo.text}\"\\n\\nInstruction: ${instruction}`;
+      const fullMessage = `IMPORTANT: Return ONLY the rewritten text. Do NOT include explanations, commentary, or phrases like "here's the rewrite" or "I changed". Just output the final text directly.
+
+Selected text: "${selectedTextInfo.text}"
+
+Instruction: ${instruction}`;
       
       let aiResponse = '';
       const stream = apiService.streamChat({
