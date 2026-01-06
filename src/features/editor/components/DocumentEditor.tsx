@@ -9,6 +9,8 @@ import {
   getFinalContent,
   buildTextSpans
 } from '../../../utils/revisions';
+import { SelectionPopup } from './SelectionPopup';
+import { apiService } from '../../../services/api';
 import './DocumentEditor.css';
 
 interface DocumentEditorProps {
@@ -21,7 +23,7 @@ interface DocumentEditorProps {
   projectId: number | null;
 }
 
-function DocumentEditor({ content, onChange, onSelection, purpose: _purpose, selectedModel: _selectedModel, projectId: _projectId, partner: _partner }: DocumentEditorProps) {
+function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel, projectId, partner }: DocumentEditorProps) {
   const [localContent, setLocalContent] = useState(content);
   const editorRef = useRef<HTMLDivElement>(null);
   const isUpdatingRef = useRef(false);
@@ -32,6 +34,15 @@ function DocumentEditor({ content, onChange, onSelection, purpose: _purpose, sel
     revisions: [],
     activeRevisionId: null,
   });
+  
+  // Selection popup state
+  const [showPopup, setShowPopup] = useState(false);
+  const [popupPosition, setPopupPosition] = useState({ x: 0, y: 0 });
+  const [selectedTextInfo, setSelectedTextInfo] = useState<{
+    text: string;
+    range: { start: number; end: number };
+  } | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     // Only update if content changed from external source
@@ -152,8 +163,8 @@ function DocumentEditor({ content, onChange, onSelection, purpose: _purpose, sel
     const selection = window.getSelection();
     if (!selection || !editorRef.current) return;
     
-    const selectedText = selection.toString();
-    if (selectedText) {
+    const selectedText = selection.toString().trim();
+    if (selectedText && selectedText.length > 0) {
       // Calculate position in the document
       const range = selection.getRangeAt(0);
       const preSelectionRange = range.cloneRange();
@@ -162,8 +173,19 @@ function DocumentEditor({ content, onChange, onSelection, purpose: _purpose, sel
       const start = preSelectionRange.toString().length;
       const end = start + selectedText.length;
       
+      // Calculate popup position
+      const rect = range.getBoundingClientRect();
+      const popupX = rect.left + (rect.width / 2);
+      const popupY = rect.bottom + window.scrollY + 8;
+      
+      setSelectedTextInfo({ text: selectedText, range: { start, end } });
+      setPopupPosition({ x: popupX, y: popupY });
+      setShowPopup(true);
+      
       onSelection(selectedText, { start, end });
     } else {
+      setShowPopup(false);
+      setSelectedTextInfo(null);
       onSelection('', null);
     }
   }, [onSelection]);
@@ -287,6 +309,54 @@ function DocumentEditor({ content, onChange, onSelection, purpose: _purpose, sel
     editorRef.current.innerHTML = html;
   }, [revisionDoc]);
   
+  // Handle selection popup submission
+  const handlePopupSubmit = useCallback(async (instruction: string) => {
+    if (!selectedTextInfo || !projectId) return;
+    
+    setIsGenerating(true);
+    
+    try {
+      const fullMessage = `Selected text: \"${selectedTextInfo.text}\"\\n\\nInstruction: ${instruction}`;
+      
+      let aiResponse = '';
+      const stream = apiService.streamChat({
+        message: fullMessage,
+        documentContent: localContent,
+        selectedText: selectedTextInfo.text,
+        purpose: purpose || 'General writing',
+        partner: partner || 'Creative Assistant',
+        model: selectedModel,
+        projectId,
+      });
+      
+      for await (const chunk of stream) {
+        aiResponse += chunk;
+      }
+      
+      // Apply the AI's response as a revision
+      if (aiResponse.trim()) {
+        applyRevision(
+          selectedTextInfo.range.start,
+          selectedTextInfo.range.end,
+          aiResponse.trim()
+        );
+      }
+      
+      setShowPopup(false);
+      setSelectedTextInfo(null);
+    } catch (error) {
+      console.error('Error generating AI response:', error);
+      alert('Failed to generate AI response. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [selectedTextInfo, projectId, localContent, purpose, partner, selectedModel, applyRevision]);
+  
+  const handlePopupClose = useCallback(() => {
+    setShowPopup(false);
+    setSelectedTextInfo(null);
+  }, []);
+  
   // Expose applyRevision method to parent components
   useEffect(() => {
     (window as any).__editorApplyRevision = applyRevision;
@@ -392,7 +462,20 @@ function DocumentEditor({ content, onChange, onSelection, purpose: _purpose, sel
         <span className="hint-item">
           Click ✓ or ✗ to accept/reject changes
         </span>
+        <span className="hint-item">
+          Select text to get AI assistance
+        </span>
       </div>
+      
+      {showPopup && selectedTextInfo && (
+        <SelectionPopup
+          selectedText={selectedTextInfo.text}
+          position={popupPosition}
+          onSubmit={handlePopupSubmit}
+          onClose={handlePopupClose}
+          isLoading={isGenerating}
+        />
+      )}
     </div>
   );
 }

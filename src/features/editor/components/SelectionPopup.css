@@ -1,0 +1,171 @@
+.selection-popup {
+  position: fixed;
+  z-index: 1000;
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  min-width: 320px;
+  max-width: 450px;
+  animation: popup-fade-in 0.15s ease-out;
+}
+
+@keyframes popup-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.selection-popup__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 12px 12px 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.selection-popup__selected-text {
+  flex: 1;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.selection-popup__close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 24px;
+  line-height: 1;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-left: 8px;
+  transition: color 0.2s;
+}
+
+.selection-popup__close:hover:not(:disabled) {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.selection-popup__close:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.selection-popup__form {
+  padding: 12px;
+}
+
+.selection-popup__input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 0.9rem;
+  padding: 10px;
+  resize: vertical;
+  min-height: 70px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.selection-popup__input:focus {
+  outline: none;
+  border-color: rgba(139, 92, 246, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.selection-popup__input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.selection-popup__input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.selection-popup__actions {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.selection-popup__submit {
+  width: 100%;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.selection-popup__submit:hover:not(:disabled) {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+}
+
+.selection-popup__submit:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.selection-popup__submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.selection-popup__spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.selection-popup__hint {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.4);
+  text-align: center;
+}
+
+/* Adjust position to avoid going off-screen */
+.selection-popup {
+  transform: translateX(-50%);
+}
+
+/* Make sure popup stays within viewport */
+@media (max-width: 500px) {
+  .selection-popup {
+    left: 50% !important;
+    min-width: 280px;
+    max-width: calc(100vw - 40px);
+  }
+}
