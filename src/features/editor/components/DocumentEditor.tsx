@@ -41,6 +41,7 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
     range: { start: number; end: number };
   } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const highlightSpanRef = useRef<HTMLSpanElement | null>(null);
 
   useEffect(() => {
     // Only update if content changed from external source
@@ -163,26 +164,45 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
     
     const selectedText = selection.toString().trim();
     if (selectedText && selectedText.length > 0) {
-      // Calculate position in the document
+      // Remove any existing highlight
+      if (highlightSpanRef.current) {
+        const text = highlightSpanRef.current.textContent || '';
+        highlightSpanRef.current.replaceWith(document.createTextNode(text));
+        highlightSpanRef.current = null;
+      }
+      
+      // Get the range and wrap selection in a persistent highlight span
       const range = selection.getRangeAt(0);
-      const preSelectionRange = range.cloneRange();
-      preSelectionRange.selectNodeContents(editorRef.current);
-      preSelectionRange.setEnd(range.startContainer, range.startOffset);
-      const start = preSelectionRange.toString().length;
-      const end = start + selectedText.length;
+      const span = document.createElement('span');
+      span.className = 'ai-selection-highlight';
       
-      // Calculate popup position
-      const rect = range.getBoundingClientRect();
-      const popupX = rect.left + (rect.width / 2);
-      const popupY = rect.bottom + window.scrollY + 8;
-      
-      setSelectedTextInfo({ text: selectedText, range: { start, end } });
-      setPopupPosition({ x: popupX, y: popupY });
-      setShowPopup(true);
-      
-      onSelection(selectedText, { start, end });
-      
-      // Keep the selection active - don't clear it
+      try {
+        range.surroundContents(span);
+        highlightSpanRef.current = span;
+        
+        // Calculate position for popup
+        const rect = span.getBoundingClientRect();
+        const popupX = rect.left + (rect.width / 2);
+        const popupY = rect.bottom + window.scrollY + 8;
+        
+        // Calculate position in document (before wrapping)
+        const preSelectionRange = document.createRange();
+        preSelectionRange.selectNodeContents(editorRef.current);
+        preSelectionRange.setEnd(span.firstChild || span, 0);
+        const start = preSelectionRange.toString().length;
+        const end = start + selectedText.length;
+        
+        setSelectedTextInfo({ text: selectedText, range: { start, end } });
+        setPopupPosition({ x: popupX, y: popupY });
+        setShowPopup(true);
+        
+        onSelection(selectedText, { start, end });
+        
+        // Clear the browser's selection so it doesn't interfere
+        selection.removeAllRanges();
+      } catch (e) {
+        console.error('Failed to wrap selection:', e);
+      }
     } else if (!showPopup) {
       // Only clear if popup is not showing
       setSelectedTextInfo(null);
@@ -329,6 +349,13 @@ Instruction: ${instruction}`;
       
       // Apply the AI's response as a revision
       if (aiResponse.trim()) {
+        // Remove highlight span before applying revision
+        if (highlightSpanRef.current) {
+          const text = highlightSpanRef.current.textContent || '';
+          highlightSpanRef.current.replaceWith(document.createTextNode(text));
+          highlightSpanRef.current = null;
+        }
+        
         applyRevision(
           selectedTextInfo.range.start,
           selectedTextInfo.range.end,
@@ -348,7 +375,14 @@ Instruction: ${instruction}`;
   
   const handlePopupClose = useCallback(() => {
     setShowPopup(false);
-    // Keep selectedTextInfo - don't clear the highlight
+    setSelectedTextInfo(null);
+    
+    // Remove the highlight span
+    if (highlightSpanRef.current) {
+      const text = highlightSpanRef.current.textContent || '';
+      highlightSpanRef.current.replaceWith(document.createTextNode(text));
+      highlightSpanRef.current = null;
+    }
   }, []);
   
   // Expose applyRevision method to parent components

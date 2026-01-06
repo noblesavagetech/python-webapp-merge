@@ -185,6 +185,17 @@
   user-select: none;
 }
 
+/* Persistent AI selection highlight */
+.ai-selection-highlight {
+  background: rgba(139, 92, 246, 0.3);
+  border-radius: 2px;
+  transition: background 0.2s;
+}
+
+.ai-selection-highlight:hover {
+  background: rgba(139, 92, 246, 0.4);
+}
+
 /* Revision Action Buttons (inline with inserted text) */
 .revision-actions {
   display: inline-flex;
