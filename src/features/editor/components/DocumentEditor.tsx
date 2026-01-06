@@ -199,12 +199,29 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
     
     // Update editor with final content (no more revisions for this one)
     if (editorRef.current) {
-      if (updated.revisions.length === 0) {
-        // No more revisions - back to plain text
+      if (updated.revisions.filter(r => r.status === 'pending').length === 0) {
+        // No more pending revisions - back to plain text
         editorRef.current.textContent = finalContent;
       } else {
-        // Still have other revisions - rebuild HTML
-        const html = buildEditorHTML();
+        // Still have other pending revisions - rebuild HTML with updated doc
+        const html = buildTextSpans(updated.baseContent, updated.revisions).map((span) => {
+          const escapedText = span.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          
+          if (span.type === 'deleted') {
+            return `<span class="text-span text-span--deleted" contenteditable="false">${escapedText}</span>`;
+          } else if (span.type === 'inserted') {
+            const revision = updated.revisions.find(r => r.newSpan?.id === span.id);
+            const buttons = revision 
+              ? `<span class="revision-actions" contenteditable="false">
+                   <button class="revision-action revision-action--accept" data-revision-id="${revision.id}" data-action="accept">✓</button>
+                   <button class="revision-action revision-action--reject" data-revision-id="${revision.id}" data-action="reject">✗</button>
+                 </span>`
+              : '';
+            return `<span class="text-span text-span--inserted" contenteditable="false">${escapedText}${buttons}</span>`;
+          } else {
+            return escapedText;
+          }
+        }).join('');
         editorRef.current.innerHTML = html;
       }
       
@@ -221,7 +238,7 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
         }
       }, 0);
     }
-  }, [revisionDoc, onChange, buildEditorHTML]);
+  }, [revisionDoc, onChange]);
   
   const handleRejectRevision = useCallback((revisionId: string) => {
     const updated = rejectRevision(revisionDoc, revisionId);
@@ -231,12 +248,29 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
     if (editorRef.current) {
       const finalContent = getFinalContent(updated);
       
-      if (updated.revisions.length === 0) {
-        // No more revisions
+      if (updated.revisions.filter(r => r.status === 'pending').length === 0) {
+        // No more pending revisions - show final content
         editorRef.current.textContent = finalContent;
       } else {
-        // Still have revisions
-        const html = buildEditorHTML();
+        // Still have pending revisions - rebuild with updated doc
+        const html = buildTextSpans(updated.baseContent, updated.revisions).map((span) => {
+          const escapedText = span.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          
+          if (span.type === 'deleted') {
+            return `<span class="text-span text-span--deleted" contenteditable="false">${escapedText}</span>`;
+          } else if (span.type === 'inserted') {
+            const revision = updated.revisions.find(r => r.newSpan?.id === span.id);
+            const buttons = revision 
+              ? `<span class="revision-actions" contenteditable="false">
+                   <button class="revision-action revision-action--accept" data-revision-id="${revision.id}" data-action="accept">✓</button>
+                   <button class="revision-action revision-action--reject" data-revision-id="${revision.id}" data-action="reject">✗</button>
+                 </span>`
+              : '';
+            return `<span class="text-span text-span--inserted" contenteditable="false">${escapedText}${buttons}</span>`;
+          } else {
+            return escapedText;
+          }
+        }).join('');
         editorRef.current.innerHTML = html;
       }
       
@@ -246,7 +280,7 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
         }
       }, 0);
     }
-  }, [revisionDoc, buildEditorHTML]);
+  }, [revisionDoc]);
   
   const handleAcceptAll = useCallback(() => {
     const updated = acceptAllRevisions(revisionDoc);
