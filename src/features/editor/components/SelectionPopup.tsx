@@ -23,11 +23,6 @@ export function SelectionPopup({
   const popupRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Focus input when popup opens
-    inputRef.current?.focus();
-  }, []);
-
-  useEffect(() => {
     // Close on outside click (but not on editor)
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
