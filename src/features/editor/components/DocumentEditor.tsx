@@ -192,34 +192,77 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
 
   // Revision handlers
   const handleAcceptRevision = useCallback((revisionId: string) => {
+    console.log('[Accept] Before:', { baseContent: revisionDoc.baseContent, revisions: revisionDoc.revisions.length });
     const updated = acceptRevision(revisionDoc, revisionId);
+    console.log('[Accept] After:', { baseContent: updated.baseContent, revisions: updated.revisions.length });
     setRevisionDoc(updated);
     const finalContent = getFinalContent(updated);
+    console.log('[Accept] Final content:', finalContent);
     onChange(finalContent);
     
-    // Rebuild editor
+    // Rebuild editor with updated doc
     if (editorRef.current) {
       if (updated.revisions.length === 0) {
+        console.log('[Accept] Setting plain text');
         editorRef.current.textContent = finalContent;
       } else {
-        editorRef.current.innerHTML = buildEditorHTML();
+        console.log('[Accept] Building HTML for remaining revisions');
+        const spans = buildTextSpans(updated.baseContent, updated.revisions);
+        const html = spans.map((span) => {
+          const escapedText = span.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          
+          if (span.type === 'deleted') {
+            return `<span class="text-span text-span--deleted" contenteditable="false">${escapedText}</span>`;
+          } else if (span.type === 'inserted') {
+            const revision = updated.revisions.find(r => r.newSpan?.id === span.id);
+            const buttons = revision 
+              ? `<span class="revision-actions" contenteditable="false">
+                   <button class="revision-action revision-action--accept" data-revision-id="${revision.id}" data-action="accept">✓</button>
+                   <button class="revision-action revision-action--reject" data-revision-id="${revision.id}" data-action="reject">✗</button>
+                 </span>`
+              : '';
+            return `<span class="text-span text-span--inserted" contenteditable="false">${escapedText}${buttons}</span>`;
+          } else {
+            return escapedText;
+          }
+        }).join('');
+        editorRef.current.innerHTML = html;
       }
     }
-  }, [revisionDoc, onChange, buildEditorHTML]);
+  }, [revisionDoc, onChange]);
   
   const handleRejectRevision = useCallback((revisionId: string) => {
     const updated = rejectRevision(revisionDoc, revisionId);
     setRevisionDoc(updated);
     
-    // Rebuild editor
+    // Rebuild editor with updated doc
     if (editorRef.current) {
       if (updated.revisions.length === 0) {
         editorRef.current.textContent = updated.baseContent;
       } else {
-        editorRef.current.innerHTML = buildEditorHTML();
+        const spans = buildTextSpans(updated.baseContent, updated.revisions);
+        const html = spans.map((span) => {
+          const escapedText = span.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          
+          if (span.type === 'deleted') {
+            return `<span class="text-span text-span--deleted" contenteditable="false">${escapedText}</span>`;
+          } else if (span.type === 'inserted') {
+            const revision = updated.revisions.find(r => r.newSpan?.id === span.id);
+            const buttons = revision 
+              ? `<span class="revision-actions" contenteditable="false">
+                   <button class="revision-action revision-action--accept" data-revision-id="${revision.id}" data-action="accept">✓</button>
+                   <button class="revision-action revision-action--reject" data-revision-id="${revision.id}" data-action="reject">✗</button>
+                 </span>`
+              : '';
+            return `<span class="text-span text-span--inserted" contenteditable="false">${escapedText}${buttons}</span>`;
+          } else {
+            return escapedText;
+          }
+        }).join('');
+        editorRef.current.innerHTML = html;
       }
     }
-  }, [revisionDoc, buildEditorHTML]);
+  }, [revisionDoc]);
   
   const handleAcceptAll = useCallback(() => {
     const updated = acceptAllRevisions(revisionDoc);
