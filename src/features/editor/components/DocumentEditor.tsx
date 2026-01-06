@@ -41,22 +41,27 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
     range: { start: number; end: number };
   } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  
+  // Track the last content we received from parent to detect external changes
+  const lastExternalContentRef = useRef(content);
 
   useEffect(() => {
-    // Only update if content changed from external source
-    if (content !== localContent && !isUpdatingRef.current) {
+    // Only update if content changed from external source (not from our own edits)
+    // AND there are no pending revisions (to avoid overwriting revision state)
+    if (content !== lastExternalContentRef.current && !isUpdatingRef.current && revisionDoc.revisions.length === 0) {
+      lastExternalContentRef.current = content;
       setLocalContent(content);
       setRevisionDoc(prev => ({
         ...prev,
         baseContent: content,
       }));
       
-      // Update editor only if there are no revisions
-      if (editorRef.current && revisionDoc.revisions.length === 0) {
+      // Update editor
+      if (editorRef.current) {
         editorRef.current.textContent = content;
       }
     }
-  }, [content, localContent]);
+  }, [content, revisionDoc.revisions.length]);
 
   // Generate ghost suggestion (disabled in revision mode for now)
   // const generateGhostSuggestion = useCallback(async (text: string, cursorPosition: number) => {
@@ -207,6 +212,8 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
     };
     
     setRevisionDoc(updated);
+    setLocalContent(newContent);
+    lastExternalContentRef.current = newContent; // Prevent useEffect from reverting
     onChange(newContent);
     
     // Update editor using the updated doc, not stale closure
@@ -238,39 +245,42 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
   const handleRejectRevision = useCallback((revisionId: string) => {
     if (!editorRef.current) return;
     
-    // Simple: just remove the revision
+    // Just remove the revision - keep baseContent unchanged (that's the whole point of reject!)
     const updated = {
       ...revisionDoc,
       revisions: revisionDoc.revisions.filter(r => r.id !== revisionId),
     };
     
     setRevisionDoc(updated);
+    // DO NOT call onChange here - rejecting means keeping the original content
+    // The baseContent already IS the correct content
     
-    // Update editor using the updated doc, not stale closure
-    if (editorRef.current) {
-      if (updated.revisions.length === 0) {
-        editorRef.current.textContent = updated.baseContent;
-      } else {
-        const spans = buildTextSpans(updated.baseContent, updated.revisions);
-        editorRef.current.innerHTML = spans.map((span) => {
-          const escapedText = span.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          
-          if (span.type === 'deleted') {
-            return `<span class="text-span text-span--deleted" contenteditable="false">${escapedText}</span>`;
-          } else if (span.type === 'inserted') {
-            const revision = updated.revisions.find(r => r.newSpan?.id === span.id);
-            const buttons = revision 
-              ? `<span class="revision-actions" contenteditable="false">
-                   <button class="revision-action revision-action--accept" data-revision-id="${revision.id}" data-action="accept">✓</button>
-                   <button class="revision-action revision-action--reject" data-revision-id="${revision.id}" data-action="reject">✗</button>
-                 </span>`
-              : '';
-            return `<span class="text-span text-span--inserted" contenteditable="false">${escapedText}${buttons}</span>`;
-          } else {
-            return escapedText;
-          }
-        }).join('');
-      }
+    // Update editor display
+    if (updated.revisions.length === 0) {
+      // No more revisions - show plain baseContent
+      editorRef.current.textContent = updated.baseContent;
+      setLocalContent(updated.baseContent);
+    } else {
+      // Still have other revisions - rebuild the HTML
+      const spans = buildTextSpans(updated.baseContent, updated.revisions);
+      editorRef.current.innerHTML = spans.map((span) => {
+        const escapedText = span.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        
+        if (span.type === 'deleted') {
+          return `<span class="text-span text-span--deleted" contenteditable="false">${escapedText}</span>`;
+        } else if (span.type === 'inserted') {
+          const revision = updated.revisions.find(r => r.newSpan?.id === span.id);
+          const buttons = revision 
+            ? `<span class="revision-actions" contenteditable="false">
+                 <button class="revision-action revision-action--accept" data-revision-id="${revision.id}" data-action="accept">✓</button>
+                 <button class="revision-action revision-action--reject" data-revision-id="${revision.id}" data-action="reject">✗</button>
+               </span>`
+            : '';
+          return `<span class="text-span text-span--inserted" contenteditable="false">${escapedText}${buttons}</span>`;
+        } else {
+          return escapedText;
+        }
+      }).join('');
     }
   }, [revisionDoc]);
   
