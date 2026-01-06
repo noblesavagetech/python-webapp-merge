@@ -247,33 +247,9 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
     setRevisionDoc(updated);
     
     // Update editor using the updated doc, not stale closure
-    if (updated.revisions.length === 0) {
-      editorRef.current.textContent = revisionDoc.baseContent;
-    } else {
-      const spans = buildTextSpans(updated.baseContent, updated.revisions);
-      editorRef.current.innerHTML = spans.map((span) => {
-        const escapedText = span.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        
-        if (span.type === 'deleted') {
-          return `<span class="text-span text-span--deleted" contenteditable="false">${escapedText}</span>`;
-        } else if (span.type === 'inserted') {
-          const revision = updated.revisions.find(r => r.newSpan?.id === span.id);
-          const buttons = revision 
-            ? `<span class="revision-actions" contenteditable="false">
-                 <butt using updated doc
     if (editorRef.current) {
       if (updated.revisions.length === 0) {
-        editorRef.current.textContent = finalContent;
-      } else {
-        const spans = buildTextSpans(updated.baseContent, updated.revisions);
-        editorRef.current.innerHTML = spans.map((span) => {
-          const escapedText = span.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          
-          if (span.type === 'deleted') {
-            return `<s using updated doc
-    if (editorRef.current) {
-      if (updated.revisions.length === 0) {
-        editorRef.current.textContent = revisionDoc.baseContent;
+        editorRef.current.textContent = updated.baseContent;
       } else {
         const spans = buildTextSpans(updated.baseContent, updated.revisions);
         editorRef.current.innerHTML = spans.map((span) => {
@@ -295,24 +271,6 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
           }
         }).join('');
       }
-    }
-  }, [revisionDocsion-actions" contenteditable="false">
-                   <button class="revision-action revision-action--accept" data-revision-id="${revision.id}" data-action="accept">✓</button>
-                   <button class="revision-action revision-action--reject" data-revision-id="${revision.id}" data-action="reject">✗</button>
-                 </span>`
-              : '';
-            return `<span class="text-span text-span--inserted" contenteditable="false">${escapedText}${buttons}</span>`;
-          } else {
-            return escapedText;
-          }
-        }).join('');
-      }
-    }
-  }, [revisionDoc, onChanget-span--inserted" contenteditable="false">${escapedText}${buttons}</span>`;
-        } else {
-          return escapedText;
-        }
-      }).join('');
     }
   }, [revisionDoc]);
   
