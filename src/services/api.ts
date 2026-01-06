@@ -364,6 +364,8 @@ class APIService {
     const formData = new FormData();
     formData.append("file", file);
 
+    console.log(`[Membrane] Uploading file: ${file.name}, train=${train}, size=${file.size}`);
+
     const response = await fetch(
       `${API_BASE_URL}/api/projects/${projectId}/upload/file?train=${train}`,
       {
@@ -374,10 +376,14 @@ class APIService {
     );
 
     if (!response.ok) {
-      throw new Error(`Upload error: ${response.statusText}`);
+      const errorText = await response.text();
+      console.error(`[Membrane] Upload failed:`, response.status, errorText);
+      throw new Error(`Upload error (${response.status}): ${errorText || response.statusText}`);
     }
 
-    return response.json();
+    const result = await response.json();
+    console.log(`[Membrane] Upload successful:`, result);
+    return result;
   }
 
   async listFiles(projectId: number): Promise<any[]> {

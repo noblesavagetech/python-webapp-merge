@@ -159,7 +159,7 @@ export function acceptRevision(
 }
 
 /**
- * Reject a revision: keep original text
+ * Reject a revision: keep original text, remove the revision
  */
 export function rejectRevision(
   doc: DocumentWithRevisions,
@@ -167,9 +167,7 @@ export function rejectRevision(
 ): DocumentWithRevisions {
   return {
     ...doc,
-    revisions: doc.revisions.map(r =>
-      r.id === revisionId ? { ...r, status: 'rejected' as const } : r
-    ),
+    revisions: doc.revisions.filter(r => r.id !== revisionId),
   };
 }
 

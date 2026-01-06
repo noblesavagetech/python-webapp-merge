@@ -197,90 +197,29 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
     const finalContent = getFinalContent(updated);
     onChange(finalContent);
     
-    // Update editor with final content (no more revisions for this one)
+    // Rebuild editor
     if (editorRef.current) {
-      if (updated.revisions.filter(r => r.status === 'pending').length === 0) {
-        // No more pending revisions - back to plain text
+      if (updated.revisions.length === 0) {
         editorRef.current.textContent = finalContent;
       } else {
-        // Still have other pending revisions - rebuild HTML with updated doc
-        const html = buildTextSpans(updated.baseContent, updated.revisions).map((span) => {
-          const escapedText = span.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          
-          if (span.type === 'deleted') {
-            return `<span class="text-span text-span--deleted" contenteditable="false">${escapedText}</span>`;
-          } else if (span.type === 'inserted') {
-            const revision = updated.revisions.find(r => r.newSpan?.id === span.id);
-            const buttons = revision 
-              ? `<span class="revision-actions" contenteditable="false">
-                   <button class="revision-action revision-action--accept" data-revision-id="${revision.id}" data-action="accept">✓</button>
-                   <button class="revision-action revision-action--reject" data-revision-id="${revision.id}" data-action="reject">✗</button>
-                 </span>`
-              : '';
-            return `<span class="text-span text-span--inserted" contenteditable="false">${escapedText}${buttons}</span>`;
-          } else {
-            return escapedText;
-          }
-        }).join('');
-        editorRef.current.innerHTML = html;
+        editorRef.current.innerHTML = buildEditorHTML();
       }
-      
-      // Put cursor at end
-      setTimeout(() => {
-        if (editorRef.current) {
-          editorRef.current.focus();
-          const range = document.createRange();
-          const sel = window.getSelection();
-          range.selectNodeContents(editorRef.current);
-          range.collapse(false);
-          sel?.removeAllRanges();
-          sel?.addRange(range);
-        }
-      }, 0);
     }
-  }, [revisionDoc, onChange]);
+  }, [revisionDoc, onChange, buildEditorHTML]);
   
   const handleRejectRevision = useCallback((revisionId: string) => {
     const updated = rejectRevision(revisionDoc, revisionId);
     setRevisionDoc(updated);
     
-    // Update editor
+    // Rebuild editor
     if (editorRef.current) {
-      const finalContent = getFinalContent(updated);
-      
-      if (updated.revisions.filter(r => r.status === 'pending').length === 0) {
-        // No more pending revisions - show final content
-        editorRef.current.textContent = finalContent;
+      if (updated.revisions.length === 0) {
+        editorRef.current.textContent = updated.baseContent;
       } else {
-        // Still have pending revisions - rebuild with updated doc
-        const html = buildTextSpans(updated.baseContent, updated.revisions).map((span) => {
-          const escapedText = span.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-          
-          if (span.type === 'deleted') {
-            return `<span class="text-span text-span--deleted" contenteditable="false">${escapedText}</span>`;
-          } else if (span.type === 'inserted') {
-            const revision = updated.revisions.find(r => r.newSpan?.id === span.id);
-            const buttons = revision 
-              ? `<span class="revision-actions" contenteditable="false">
-                   <button class="revision-action revision-action--accept" data-revision-id="${revision.id}" data-action="accept">✓</button>
-                   <button class="revision-action revision-action--reject" data-revision-id="${revision.id}" data-action="reject">✗</button>
-                 </span>`
-              : '';
-            return `<span class="text-span text-span--inserted" contenteditable="false">${escapedText}${buttons}</span>`;
-          } else {
-            return escapedText;
-          }
-        }).join('');
-        editorRef.current.innerHTML = html;
+        editorRef.current.innerHTML = buildEditorHTML();
       }
-      
-      setTimeout(() => {
-        if (editorRef.current) {
-          editorRef.current.focus();
-        }
-      }, 0);
     }
-  }, [revisionDoc]);
+  }, [revisionDoc, buildEditorHTML]);
   
   const handleAcceptAll = useCallback(() => {
     const updated = acceptAllRevisions(revisionDoc);

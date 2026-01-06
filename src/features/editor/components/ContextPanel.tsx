@@ -50,18 +50,25 @@ function ContextPanel({ memories, onRemoveMemory, projectId }: ContextPanelProps
 
   const handleTrainUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !projectId) return;
+    if (!file || !projectId) {
+      console.log('Upload cancelled: no file or projectId', { file: !!file, projectId });
+      return;
+    }
 
+    console.log('Starting training file upload:', file.name);
     setUploading(true);
     try {
-      await apiService.uploadFile(projectId, file, true);  // train=true
+      const result = await apiService.uploadFile(projectId, file, true);  // train=true
+      console.log('Upload successful:', result);
       await loadTrainedFiles();
       if (trainInputRef.current) {
         trainInputRef.current.value = '';
       }
+      alert(`✓ Successfully uploaded and trained: ${file.name}`);
     } catch (error) {
       console.error('Failed to upload training file:', error);
-      alert('Failed to upload training file');
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to upload training file: ${errorMsg}`);
     } finally {
       setUploading(false);
     }
@@ -69,11 +76,16 @@ function ContextPanel({ memories, onRemoveMemory, projectId }: ContextPanelProps
 
   const handleContextUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !projectId) return;
+    if (!file || !projectId) {
+      console.log('Upload cancelled: no file or projectId', { file: !!file, projectId });
+      return;
+    }
 
+    console.log('Starting context file upload:', file.name);
     setUploading(true);
     try {
       const result = await apiService.uploadFile(projectId, file, false);  // train=false
+      console.log('Upload successful:', result);
       setContextFiles(prev => [...prev, {
         filename: result.filename,
         content: result.content,
@@ -82,9 +94,11 @@ function ContextPanel({ memories, onRemoveMemory, projectId }: ContextPanelProps
       if (contextInputRef.current) {
         contextInputRef.current.value = '';
       }
+      alert(`✓ Successfully added context file: ${file.name}`);
     } catch (error) {
       console.error('Failed to upload context file:', error);
-      alert('Failed to upload context file');
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to upload context file: ${errorMsg}`);
     } finally {
       setUploading(false);
     }
