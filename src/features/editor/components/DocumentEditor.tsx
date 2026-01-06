@@ -125,12 +125,6 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
     
     isUpdatingRef.current = true;
     
-    // Close popup when user starts typing
-    if (showPopup) {
-      setShowPopup(false);
-      setSelectedTextInfo(null);
-    }
-    
     // Only update base content if there are no pending revisions
     if (revisionDoc.revisions.length === 0) {
       setLocalContent(newText);
@@ -144,7 +138,7 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
     setTimeout(() => {
       isUpdatingRef.current = false;
     }, 100);
-  }, [revisionDoc.revisions.length, onChange, showPopup]);
+  }, [revisionDoc.revisions.length, onChange]);
 
   // Handle clicks on revision action buttons
   const handleEditorClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -187,12 +181,14 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
       setShowPopup(true);
       
       onSelection(selectedText, { start, end });
-    } else {
-      setShowPopup(false);
+      
+      // Keep the selection active - don't clear it
+    } else if (!showPopup) {
+      // Only clear if popup is not showing
       setSelectedTextInfo(null);
       onSelection('', null);
     }
-  }, [onSelection]);
+  }, [onSelection, showPopup]);
 
   // Revision handlers
   const handleAcceptRevision = useCallback((revisionId: string) => {
@@ -352,7 +348,7 @@ Instruction: ${instruction}`;
   
   const handlePopupClose = useCallback(() => {
     setShowPopup(false);
-    setSelectedTextInfo(null);
+    // Keep selectedTextInfo - don't clear the highlight
   }, []);
   
   // Expose applyRevision method to parent components
