@@ -190,6 +190,8 @@
   background: rgba(139, 92, 246, 0.3);
   border-radius: 2px;
   transition: background 0.2s;
+  user-select: text;
+  cursor: text;
 }
 
 .ai-selection-highlight:hover {
