@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { api, API_BASE_URL } from "../../services/api";
@@ -43,6 +43,41 @@ interface KeyEvent {
   id: number;
   description: string;
   order: number;
+}
+
+// Collapsible Section Component
+function CollapsibleSection({ 
+  title, 
+  children, 
+  defaultExpanded = false,
+  badge,
+  icon
+}: { 
+  title: string; 
+  children: React.ReactNode; 
+  defaultExpanded?: boolean;
+  badge?: string | number;
+  icon?: string;
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  
+  return (
+    <div className={`collapsible-section ${expanded ? 'expanded' : 'collapsed'}`}>
+      <button 
+        className="collapsible-header" 
+        onClick={() => setExpanded(!expanded)}
+        type="button"
+      >
+        <span className="collapsible-title">
+          {icon && <span className="section-icon">{icon}</span>}
+          {title}
+          {badge !== undefined && <span className="section-badge">{badge}</span>}
+        </span>
+        <span className="collapsible-arrow">{expanded ? '▼' : '▶'}</span>
+      </button>
+      {expanded && <div className="collapsible-content">{children}</div>}
+    </div>
+  );
 }
 
 export function StoryEditor() {
@@ -100,6 +135,11 @@ export function StoryEditor() {
   const [selectedCharsBeat, setSelectedCharsBeat] = useState<string[]>([]);
   const [aiBeatResult, setAiBeatResult] = useState("");
   const [generatingBeat, setGeneratingBeat] = useState(false);
+  
+  // Query Mode - allows asking about the context without generating
+  const [queryInput, setQueryInput] = useState("");
+  const [queryResult, setQueryResult] = useState("");
+  const [querying, setQuerying] = useState(false);
 
   // AI Model Selection
   const [proseModel, setProseModel] = useState("anthropic/claude-3.5-sonnet");
@@ -110,6 +150,16 @@ export function StoryEditor() {
   const [saveMessage, setSaveMessage] = useState("");
 
   const storyIdNum = id ? parseInt(id, 10) : null;
+  
+  // Build full character context string for AI
+  const characterContextString = useMemo(() => {
+    return characters.map(c => {
+      let charStr = `**${c.name}**`;
+      if (c.traits) charStr += `\n  - Traits: ${c.traits}`;
+      if (c.backstory) charStr += `\n  - Backstory: ${c.backstory}`;
+      return charStr;
+    }).join('\n\n') || '(No characters defined)';
+  }, [characters]);
 
   useEffect(() => {
     loadStory();
@@ -450,11 +500,25 @@ export function StoryEditor() {
           ? beats.map((b) => `${b.order}. ${b.description}`).join("\n")
           : "None";
 
-      // Format character info
-      const charStr =
-        selectedCharsProse.length > 0
-          ? selectedCharsProse.join(", ")
-          : "no characters";
+      // Format key events
+      const eventsStr =
+        keyEvents.length > 0
+          ? keyEvents.map((e) => `${e.order}. ${e.description}`).join("\n")
+          : "None";
+
+      // FIXED: Include FULL character information, not just names
+      const selectedCharsWithDetails = characters
+        .filter(c => selectedCharsProse.includes(c.name))
+        .map(c => {
+          let charStr = `**${c.name}**`;
+          if (c.traits) charStr += `\n    Traits: ${c.traits}`;
+          if (c.backstory) charStr += `\n    Backstory: ${c.backstory}`;
+          return charStr;
+        });
+      
+      const charStr = selectedCharsWithDetails.length > 0
+        ? selectedCharsWithDetails.join('\n\n')
+        : "(No characters selected - available: " + characters.map(c => c.name).join(', ') + ")";
 
       // Include chapter summary
       const summaryStr = currentChapter.summary || "No summary available";
@@ -468,8 +532,8 @@ export function StoryEditor() {
           ? `\n\nBeat Generator Instructions:\n${beatPrompt}`
           : "";
 
-      // Construct prompt matching reference implementation
-      const fullPrompt = `${prosePrompt}\n\nChapter Summary:\n${summaryStr}\n\nCharacter Information:\n${charStr}\n\nBeats/Scenes to Expand:\n${beatsStr}\n\nScene Input: ${sceneInput}\n\nRecent chapter context (last 2000 words):\n${last2000}\n\nWorld Building Elements:\n${worldElementsStr}${beatContextStr}${beatInstructionsStr}`;
+      // Construct prompt with FULL character data and all context
+      const fullPrompt = `${prosePrompt}\n\nChapter Summary:\n${summaryStr}\n\n## CHARACTER INFORMATION (use this for characterization):\n${charStr}\n\nBeats/Scenes to Expand:\n${beatsStr}\n\nKey Events:\n${eventsStr}\n\nScene Input: ${sceneInput}\n\nRecent chapter context (last 2000 words):\n${last2000}\n\nWorld Building Elements:\n${worldElementsStr}${beatContextStr}${beatInstructionsStr}`;
 
       // Call AI API
       const response = await fetch(`${API_BASE_URL}/api/ai/generate`, {
@@ -519,11 +583,25 @@ export function StoryEditor() {
           ? beats.map((b) => `${b.order}. ${b.description}`).join("\n")
           : "None";
 
-      // Format character info
-      const charStr =
-        selectedCharsBeat.length > 0
-          ? selectedCharsBeat.join(", ")
-          : "no characters";
+      // Format key events
+      const eventsStr =
+        keyEvents.length > 0
+          ? keyEvents.map((e) => `${e.order}. ${e.description}`).join("\n")
+          : "None";
+
+      // FIXED: Include FULL character information, not just names
+      const selectedCharsWithDetails = characters
+        .filter(c => selectedCharsBeat.includes(c.name))
+        .map(c => {
+          let charStr = `**${c.name}**`;
+          if (c.traits) charStr += `\n    Traits: ${c.traits}`;
+          if (c.backstory) charStr += `\n    Backstory: ${c.backstory}`;
+          return charStr;
+        });
+      
+      const charStr = selectedCharsWithDetails.length > 0
+        ? selectedCharsWithDetails.join('\n\n')
+        : "(No characters selected - available: " + characters.map(c => c.name).join(', ') + ")";
 
       // Include chapter summary
       const summaryStr = currentChapter.summary || "No summary available";
@@ -537,8 +615,8 @@ export function StoryEditor() {
           ? `\n\nProse Generator Instructions:\n${prosePrompt}`
           : "";
 
-      // Construct prompt matching reference implementation
-      const fullPrompt = `${beatPrompt}\n\nChapter Summary:\n${summaryStr}\n\nCharacters in scene: ${charStr}\n\nExisting Beats/Scenes:\n${beatsStr}\n\nBeat/Scene Input: ${beatInput}\n\nRecent chapter context (last 2000 words):\n${last2000}\n\nWorld Building Elements:\n${worldElementsStr}${proseContextStr}${proseInstructionsStr}`;
+      // Construct prompt with FULL character data and all context
+      const fullPrompt = `${beatPrompt}\n\nChapter Summary:\n${summaryStr}\n\n## CHARACTER INFORMATION (use this for characterization):\n${charStr}\n\nExisting Beats/Scenes:\n${beatsStr}\n\nKey Events:\n${eventsStr}\n\nBeat/Scene Input: ${beatInput}\n\nRecent chapter context (last 2000 words):\n${last2000}\n\nWorld Building Elements:\n${worldElementsStr}${proseContextStr}${proseInstructionsStr}`;
 
       // Call AI API
       const response = await fetch(`${API_BASE_URL}/api/ai/generate`, {
@@ -561,6 +639,80 @@ export function StoryEditor() {
       setAiBeatResult("Error generating beat. Please try again.");
     } finally {
       setGeneratingBeat(false);
+    }
+  };
+  
+  // NEW: Query mode - ask questions about the current context without generating prose
+  const handleQueryContext = async () => {
+    if (!queryInput.trim() || !currentChapter) return;
+    setQuerying(true);
+    setQueryResult("Querying...");
+
+    try {
+      // Build full context for query
+      const worldElementsStr = worldElements.length > 0
+        ? worldElements.map((w) => `- ${w.category}: ${w.description}`).join("\n")
+        : "None";
+
+      const beatsStr = beats.length > 0
+        ? beats.map((b) => `${b.order}. ${b.description}`).join("\n")
+        : "None";
+
+      const eventsStr = keyEvents.length > 0
+        ? keyEvents.map((e) => `${e.order}. ${e.description}`).join("\n")
+        : "None";
+
+      const chapterText = currentChapter.text || "(empty)";
+
+      const contextPrompt = `You are a story assistant. The user wants to understand or query the current story context. Answer their question based ONLY on the data provided below.
+
+## STORY: ${story?.title}
+## CURRENT CHAPTER: ${currentChapter.title}
+
+### CHAPTER SUMMARY:
+${currentChapter.summary || "(no summary)"}
+
+### CHARACTERS (${characters.length}):
+${characterContextString}
+
+### BEATS/SCENES (${beats.length}):
+${beatsStr}
+
+### WORLD BUILDING (${worldElements.length}):
+${worldElementsStr}
+
+### KEY EVENTS (${keyEvents.length}):
+${eventsStr}
+
+### CHAPTER TEXT (${chapterText.length} chars):
+${chapterText.substring(0, 3000)}${chapterText.length > 3000 ? '...(truncated)' : ''}
+
+---
+
+USER QUESTION: ${queryInput}
+
+Answer the user's question based on the context above. If the information isn't available, say so clearly.`;
+
+      const response = await fetch(`${API_BASE_URL}/api/ai/generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+        },
+        body: JSON.stringify({
+          prompt: contextPrompt,
+          type: "query",
+          model: proseModel,
+        }),
+      });
+
+      const data = await response.json();
+      setQueryResult(data.content || "No response from AI");
+    } catch (error) {
+      console.error("Failed to query context:", error);
+      setQueryResult("Error querying context. Please try again.");
+    } finally {
+      setQuerying(false);
     }
   };
 
@@ -688,14 +840,16 @@ export function StoryEditor() {
           {/* Prose Generator */}
           <div className="ai-generator">
             <h3 className="generator-title">AI Prose Generator</h3>
-            <label className="form-label">Prompt (edit as needed):</label>
-            <textarea
-              className="form-textarea"
-              rows={4}
-              value={prosePrompt}
-              onChange={(e) => setProsePrompt(e.target.value)}
-              placeholder="Enter prompt for prose generation..."
-            />
+            
+            <CollapsibleSection title="System Prompt" icon="⚙️" defaultExpanded={false}>
+              <textarea
+                className="form-textarea"
+                rows={4}
+                value={prosePrompt}
+                onChange={(e) => setProsePrompt(e.target.value)}
+                placeholder="Enter prompt for prose generation..."
+              />
+            </CollapsibleSection>
 
             <label className="form-label">Scene Input:</label>
             <textarea
@@ -703,33 +857,50 @@ export function StoryEditor() {
               rows={4}
               value={sceneInput}
               onChange={(e) => setSceneInput(e.target.value)}
-              placeholder="Paste or type your chapter text here..."
+              placeholder="Describe the scene you want to generate..."
             />
 
-            <label className="form-label">Characters in Scene:</label>
-            <div className="character-checkboxes">
-              {characters.map((char) => (
-                <label key={char.id} className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={selectedCharsProse.includes(char.name)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedCharsProse([
-                          ...selectedCharsProse,
-                          char.name,
-                        ]);
-                      } else {
-                        setSelectedCharsProse(
-                          selectedCharsProse.filter((n) => n !== char.name)
-                        );
-                      }
-                    }}
-                  />
-                  {char.name}
-                </label>
-              ))}
-            </div>
+            <CollapsibleSection title="Characters in Scene" icon="👥" badge={selectedCharsProse.length} defaultExpanded={true}>
+              <div className="character-checkboxes">
+                {characters.length === 0 ? (
+                  <span className="no-items">No characters defined. Add some below!</span>
+                ) : (
+                  characters.map((char) => (
+                    <label key={char.id} className="checkbox-label" title={`${char.traits || ''}\n${char.backstory || ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={selectedCharsProse.includes(char.name)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedCharsProse([
+                              ...selectedCharsProse,
+                              char.name,
+                            ]);
+                          } else {
+                            setSelectedCharsProse(
+                              selectedCharsProse.filter((n) => n !== char.name)
+                            );
+                          }
+                        }}
+                      />
+                      {char.name}
+                    </label>
+                  ))
+                )}
+              </div>
+              {selectedCharsProse.length > 0 && (
+                <div className="selected-chars-preview">
+                  <strong>Selected character details being sent to AI:</strong>
+                  {characters.filter(c => selectedCharsProse.includes(c.name)).map(c => (
+                    <div key={c.id} className="char-preview-item">
+                      <strong>{c.name}</strong>
+                      {c.traits && <span> • Traits: {c.traits}</span>}
+                      {c.backstory && <div className="char-backstory-preview">Backstory: {c.backstory.substring(0, 100)}{c.backstory.length > 100 ? '...' : ''}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CollapsibleSection>
 
             <label className="form-label">AI Model:</label>
             <select
@@ -770,14 +941,16 @@ export function StoryEditor() {
           {/* Beat/Scene Generator */}
           <div className="ai-generator">
             <h3 className="generator-title">Beat/Scene AI Generator</h3>
-            <label className="form-label">Prompt (edit as needed):</label>
-            <textarea
-              className="form-textarea"
-              rows={10}
-              value={beatPrompt}
-              onChange={(e) => setBeatPrompt(e.target.value)}
-              placeholder="Enter prompt for beat/scene expansion..."
-            />
+            
+            <CollapsibleSection title="System Prompt" icon="⚙️" defaultExpanded={false}>
+              <textarea
+                className="form-textarea"
+                rows={10}
+                value={beatPrompt}
+                onChange={(e) => setBeatPrompt(e.target.value)}
+                placeholder="Enter prompt for beat/scene expansion..."
+              />
+            </CollapsibleSection>
 
             <label className="form-label">Beat/Scene Input:</label>
             <textarea
@@ -785,30 +958,47 @@ export function StoryEditor() {
               rows={4}
               value={beatInput}
               onChange={(e) => setBeatInput(e.target.value)}
-              placeholder="Paste or type your beats/scenes here..."
+              placeholder="Describe the beat or scene to expand..."
             />
 
-            <label className="form-label">Characters Detected:</label>
-            <div className="character-checkboxes">
-              {characters.map((char) => (
-                <label key={char.id} className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={selectedCharsBeat.includes(char.name)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedCharsBeat([...selectedCharsBeat, char.name]);
-                      } else {
-                        setSelectedCharsBeat(
-                          selectedCharsBeat.filter((n) => n !== char.name)
-                        );
-                      }
-                    }}
-                  />
-                  {char.name}
-                </label>
-              ))}
-            </div>
+            <CollapsibleSection title="Characters in Scene" icon="👥" badge={selectedCharsBeat.length} defaultExpanded={true}>
+              <div className="character-checkboxes">
+                {characters.length === 0 ? (
+                  <span className="no-items">No characters defined. Add some below!</span>
+                ) : (
+                  characters.map((char) => (
+                    <label key={char.id} className="checkbox-label" title={`${char.traits || ''}\n${char.backstory || ''}`}>
+                      <input
+                        type="checkbox"
+                        checked={selectedCharsBeat.includes(char.name)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedCharsBeat([...selectedCharsBeat, char.name]);
+                          } else {
+                            setSelectedCharsBeat(
+                              selectedCharsBeat.filter((n) => n !== char.name)
+                            );
+                          }
+                        }}
+                      />
+                      {char.name}
+                    </label>
+                  ))
+                )}
+              </div>
+              {selectedCharsBeat.length > 0 && (
+                <div className="selected-chars-preview">
+                  <strong>Selected character details being sent to AI:</strong>
+                  {characters.filter(c => selectedCharsBeat.includes(c.name)).map(c => (
+                    <div key={c.id} className="char-preview-item">
+                      <strong>{c.name}</strong>
+                      {c.traits && <span> • Traits: {c.traits}</span>}
+                      {c.backstory && <div className="char-backstory-preview">Backstory: {c.backstory.substring(0, 100)}{c.backstory.length > 100 ? '...' : ''}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CollapsibleSection>
 
             <label className="form-label">AI Model:</label>
             <select
@@ -846,345 +1036,97 @@ export function StoryEditor() {
             />
           </div>
         </div>
-
-        <hr className="section-divider" />
-
-        {/* Beats/Scenes Section */}
-        <h3 className="section-title">Beats/Scenes</h3>
-        <ul className="item-list">
-          {beats.map((beat) => (
-            <li
-              key={beat.id}
-              className="item"
-              style={{ flexDirection: "column", alignItems: "stretch" }}
-            >
-              {editingBeatId === beat.id ? (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.5rem",
-                  }}
-                >
-                  <label className="form-label">Order:</label>
-                  <input
-                    type="number"
-                    className="form-input-small"
-                    defaultValue={beat.order}
-                    id={`beat-order-${beat.id}`}
-                  />
-                  <label className="form-label">Description:</label>
-                  <textarea
-                    className="form-textarea"
-                    rows={2}
-                    defaultValue={beat.description}
-                    id={`beat-desc-${beat.id}`}
-                  />
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
-                    <button
-                      className="btn-save"
-                      onClick={() => {
-                        const order = parseInt(
-                          (
-                            document.getElementById(
-                              `beat-order-${beat.id}`
-                            ) as HTMLInputElement
-                          ).value
-                        );
-                        const desc = (
-                          document.getElementById(
-                            `beat-desc-${beat.id}`
-                          ) as HTMLTextAreaElement
-                        ).value;
-                        handleUpdateBeat(beat.id, desc, order);
-                      }}
-                    >
-                      Save
-                    </button>
-                    <button
-                      className="btn-cancel"
-                      onClick={() => setEditingBeatId(null)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <span>
-                    {beat.order}. {beat.description}
-                  </span>
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
-                    <button
-                      className="btn-edit"
-                      onClick={() => setEditingBeatId(beat.id)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="btn-delete"
-                      onClick={() => handleDeleteBeat(beat.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              )}
-            </li>
-          ))}
-          {beats.length === 0 && (
-            <li className="no-items">No beats/scenes yet.</li>
-          )}
-        </ul>
-        <div className="add-form">
-          <label className="form-label">Beat Number:</label>
-          <input
-            type="number"
-            className="form-input-small"
-            value={newBeatOrder}
-            onChange={(e) => setNewBeatOrder(parseInt(e.target.value))}
-          />
-          <label className="form-label">Description:</label>
+        
+        {/* Context Query Mode */}
+        <div className="context-query-section">
+          <h3 className="section-title">🔍 Query Context</h3>
+          <p className="section-hint">
+            Ask questions about your story data without generating prose. See what the AI sees!
+          </p>
           <textarea
             className="form-textarea"
             rows={2}
-            value={newBeatDesc}
-            onChange={(e) => setNewBeatDesc(e.target.value)}
+            value={queryInput}
+            onChange={(e) => setQueryInput(e.target.value)}
+            placeholder="e.g., 'What characters are available?', 'Summarize the current beats', 'What do you know about [character]?'"
           />
-          <button className="btn-add" onClick={handleAddBeat}>
-            Add Beat/Scene
-          </button>
-        </div>
-
-        <hr className="section-divider" />
-
-        {/* World Building Section */}
-        <h3 className="section-title">World Building Elements</h3>
-        <div className="add-form">
-          <label className="form-label">Category:</label>
-          <select
-            className="form-select"
-            value={newWorldCategory}
-            onChange={(e) => setNewWorldCategory(e.target.value)}
+          <button
+            className="btn-query"
+            onClick={handleQueryContext}
+            disabled={querying || !queryInput.trim()}
           >
-            <option value="Settings">Settings</option>
-            <option value="Cultures">Cultures</option>
-            <option value="Magic and Tech">Magic and Tech</option>
-            <option value="History">History</option>
-            <option value="Races">Races</option>
-          </select>
-          <label className="form-label">Description:</label>
-          <textarea
-            className="form-textarea"
-            rows={2}
-            value={newWorldDesc}
-            onChange={(e) => setNewWorldDesc(e.target.value)}
-          />
-          <button className="btn-add" onClick={handleAddWorldElement}>
-            Add Element
+            {querying ? "Querying..." : "Ask About Context"}
           </button>
-        </div>
-        <ul className="item-list">
-          {worldElements.map((elem) => (
-            <li
-              key={elem.id}
-              className="item"
-              style={{ flexDirection: "column", alignItems: "stretch" }}
-            >
-              {editingWorldId === elem.id ? (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.5rem",
-                  }}
-                >
-                  <label className="form-label">Category:</label>
-                  <select
-                    className="form-select"
-                    defaultValue={elem.category}
-                    id={`world-cat-${elem.id}`}
-                  >
-                    <option value="Settings">Settings</option>
-                    <option value="Cultures">Cultures</option>
-                    <option value="Magic and Tech">Magic and Tech</option>
-                    <option value="History">History</option>
-                    <option value="Races">Races</option>
-                  </select>
-                  <label className="form-label">Description:</label>
-                  <textarea
-                    className="form-textarea"
-                    rows={2}
-                    defaultValue={elem.description}
-                    id={`world-desc-${elem.id}`}
-                  />
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
-                    <button
-                      className="btn-save"
-                      onClick={() => {
-                        const category = (
-                          document.getElementById(
-                            `world-cat-${elem.id}`
-                          ) as HTMLSelectElement
-                        ).value;
-                        const desc = (
-                          document.getElementById(
-                            `world-desc-${elem.id}`
-                          ) as HTMLTextAreaElement
-                        ).value;
-                        handleUpdateWorldElement(elem.id, category, desc);
-                      }}
-                    >
-                      Save
-                    </button>
-                    <button
-                      className="btn-cancel"
-                      onClick={() => setEditingWorldId(null)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <span>
-                    <strong>{elem.category}:</strong> {elem.description}
-                  </span>
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
-                    <button
-                      className="btn-edit"
-                      onClick={() => setEditingWorldId(elem.id)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="btn-delete"
-                      onClick={() => handleDeleteWorldElement(elem.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              )}
-            </li>
-          ))}
-          {worldElements.length === 0 && (
-            <li className="no-items">No world building elements yet.</li>
+          {queryResult && (
+            <div className="query-result">
+              <pre>{queryResult}</pre>
+            </div>
           )}
-        </ul>
+        </div>
 
         <hr className="section-divider" />
 
-        {/* Characters Section */}
-        <h3 className="section-title">Characters</h3>
-        <div className="add-form">
-          <label className="form-label">Name:</label>
-          <input
-            type="text"
-            className="form-input"
-            value={newCharName}
-            onChange={(e) => setNewCharName(e.target.value)}
-          />
-          <label className="form-label">Traits:</label>
-          <textarea
-            className="form-textarea"
-            rows={2}
-            value={newCharTraits}
-            onChange={(e) => setNewCharTraits(e.target.value)}
-          />
-          <label className="form-label">Backstory:</label>
-          <textarea
-            className="form-textarea"
-            rows={2}
-            value={newCharBackstory}
-            onChange={(e) => setNewCharBackstory(e.target.value)}
-          />
-          <button className="btn-add" onClick={handleAddCharacter}>
-            Add Character
-          </button>
-        </div>
-        <ul className="item-list">
-          {characters.map((char) => (
-            <li
-              key={char.id}
-              className="item"
-              style={{ flexDirection: "column", alignItems: "stretch" }}
-            >
-              {editingCharId === char.id ? (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.5rem",
-                  }}
-                >
-                  <label className="form-label">Name:</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    defaultValue={char.name}
-                    id={`char-name-${char.id}`}
-                  />
-                  <label className="form-label">Traits:</label>
-                  <textarea
-                    className="form-textarea"
-                    rows={2}
-                    defaultValue={char.traits || ""}
-                    id={`char-traits-${char.id}`}
-                  />
-                  <label className="form-label">Backstory:</label>
-                  <textarea
-                    className="form-textarea"
-                    rows={2}
-                    defaultValue={char.backstory || ""}
-                    id={`char-back-${char.id}`}
-                  />
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
-                    <button
-                      className="btn-save"
-                      onClick={() => {
-                        const name = (
-                          document.getElementById(
-                            `char-name-${char.id}`
-                          ) as HTMLInputElement
-                        ).value;
-                        const traits = (
-                          document.getElementById(
-                            `char-traits-${char.id}`
-                          ) as HTMLTextAreaElement
-                        ).value;
-                        const backstory = (
-                          document.getElementById(
-                            `char-back-${char.id}`
-                          ) as HTMLTextAreaElement
-                        ).value;
-                        handleUpdateCharacter(char.id, name, traits, backstory);
-                      }}
-                    >
-                      Save
-                    </button>
-                    <button
-                      className="btn-cancel"
-                      onClick={() => setEditingCharId(null)}
-                    >
-                      Cancel
-                    </button>
+        {/* Beats/Scenes Section - Collapsible */}
+        <CollapsibleSection title="Beats/Scenes" icon="🎬" badge={beats.length} defaultExpanded={false}>
+          <ul className="item-list">
+            {beats.map((beat) => (
+              <li
+                key={beat.id}
+                className="item"
+                style={{ flexDirection: "column", alignItems: "stretch" }}
+              >
+                {editingBeatId === beat.id ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.5rem",
+                    }}
+                  >
+                    <label className="form-label">Order:</label>
+                    <input
+                      type="number"
+                      className="form-input-small"
+                      defaultValue={beat.order}
+                      id={`beat-order-${beat.id}`}
+                    />
+                    <label className="form-label">Description:</label>
+                    <textarea
+                      className="form-textarea"
+                      rows={2}
+                      defaultValue={beat.description}
+                      id={`beat-desc-${beat.id}`}
+                    />
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button
+                        className="btn-save"
+                        onClick={() => {
+                          const order = parseInt(
+                            (
+                              document.getElementById(
+                                `beat-order-${beat.id}`
+                              ) as HTMLInputElement
+                            ).value
+                          );
+                          const desc = (
+                            document.getElementById(
+                              `beat-desc-${beat.id}`
+                            ) as HTMLTextAreaElement
+                          ).value;
+                          handleUpdateBeat(beat.id, desc, order);
+                        }}
+                      >
+                        Save
+                      </button>
+                      <button
+                        className="btn-cancel"
+                        onClick={() => setEditingBeatId(null)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column" }}>
+                ) : (
                   <div
                     style={{
                       display: "flex",
@@ -1192,169 +1134,429 @@ export function StoryEditor() {
                       alignItems: "center",
                     }}
                   >
-                    <strong>{char.name}</strong>
+                    <span>
+                      {beat.order}. {beat.description}
+                    </span>
                     <div style={{ display: "flex", gap: "0.5rem" }}>
                       <button
                         className="btn-edit"
-                        onClick={() => setEditingCharId(char.id)}
+                        onClick={() => setEditingBeatId(beat.id)}
                       >
                         Edit
                       </button>
                       <button
                         className="btn-delete"
-                        onClick={() => handleDeleteCharacter(char.id)}
+                        onClick={() => handleDeleteBeat(beat.id)}
                       >
                         Delete
                       </button>
                     </div>
                   </div>
-                  {char.traits && (
-                    <div className="item-detail">Traits: {char.traits}</div>
-                  )}
-                  {char.backstory && (
-                    <div className="item-detail">
-                      Backstory: {char.backstory}
-                    </div>
-                  )}
-                </div>
-              )}
-            </li>
-          ))}
-          {characters.length === 0 && (
-            <li className="no-items">No characters yet.</li>
-          )}
-        </ul>
+                )}
+              </li>
+            ))}
+            {beats.length === 0 && (
+              <li className="no-items">No beats/scenes yet.</li>
+            )}
+          </ul>
+          <div className="add-form">
+            <label className="form-label">Beat Number:</label>
+            <input
+              type="number"
+              className="form-input-small"
+              value={newBeatOrder}
+              onChange={(e) => setNewBeatOrder(parseInt(e.target.value))}
+            />
+            <label className="form-label">Description:</label>
+            <textarea
+              className="form-textarea"
+              rows={2}
+              value={newBeatDesc}
+              onChange={(e) => setNewBeatDesc(e.target.value)}
+            />
+            <button className="btn-add" onClick={handleAddBeat}>
+              Add Beat/Scene
+            </button>
+          </div>
+        </CollapsibleSection>
 
-        <hr className="section-divider" />
-
-        {/* Key Events Section */}
-        <h3 className="section-title">Key Events</h3>
-        <div className="add-form">
-          <label className="form-label">Description:</label>
-          <textarea
-            className="form-textarea"
-            rows={2}
-            value={newEventDesc}
-            onChange={(e) => setNewEventDesc(e.target.value)}
-          />
-          <label className="form-label">Order:</label>
-          <input
-            type="number"
-            className="form-input-small"
-            value={newEventOrder}
-            onChange={(e) => setNewEventOrder(parseInt(e.target.value))}
-          />
-          <button className="btn-add" onClick={handleAddKeyEvent}>
-            Add Key Event
-          </button>
-        </div>
-        <ul className="item-list">
-          {keyEvents.map((event) => (
-            <li
-              key={event.id}
-              className="item"
-              style={{ flexDirection: "column", alignItems: "stretch" }}
+        {/* World Building Section - Collapsible */}
+        <CollapsibleSection title="World Building Elements" icon="🌍" badge={worldElements.length} defaultExpanded={false}>
+          <div className="add-form">
+            <label className="form-label">Category:</label>
+            <select
+              className="form-select"
+              value={newWorldCategory}
+              onChange={(e) => setNewWorldCategory(e.target.value)}
             >
-              {editingEventId === event.id ? (
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0.5rem",
-                  }}
-                >
-                  <label className="form-label">Order:</label>
-                  <input
-                    type="number"
-                    className="form-input-small"
-                    defaultValue={event.order}
-                    id={`event-order-${event.id}`}
-                  />
-                  <label className="form-label">Description:</label>
-                  <textarea
-                    className="form-textarea"
-                    rows={2}
-                    defaultValue={event.description}
-                    id={`event-desc-${event.id}`}
-                  />
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
-                    <button
-                      className="btn-save"
-                      onClick={() => {
-                        const order = parseInt(
-                          (
+              <option value="Settings">Settings</option>
+              <option value="Cultures">Cultures</option>
+              <option value="Magic and Tech">Magic and Tech</option>
+              <option value="History">History</option>
+              <option value="Races">Races</option>
+            </select>
+            <label className="form-label">Description:</label>
+            <textarea
+              className="form-textarea"
+              rows={2}
+              value={newWorldDesc}
+              onChange={(e) => setNewWorldDesc(e.target.value)}
+            />
+            <button className="btn-add" onClick={handleAddWorldElement}>
+              Add Element
+            </button>
+          </div>
+          <ul className="item-list">
+            {worldElements.map((elem) => (
+              <li
+                key={elem.id}
+                className="item"
+                style={{ flexDirection: "column", alignItems: "stretch" }}
+              >
+                {editingWorldId === elem.id ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.5rem",
+                    }}
+                  >
+                    <label className="form-label">Category:</label>
+                    <select
+                      className="form-select"
+                      defaultValue={elem.category}
+                      id={`world-cat-${elem.id}`}
+                    >
+                      <option value="Settings">Settings</option>
+                      <option value="Cultures">Cultures</option>
+                      <option value="Magic and Tech">Magic and Tech</option>
+                      <option value="History">History</option>
+                      <option value="Races">Races</option>
+                    </select>
+                    <label className="form-label">Description:</label>
+                    <textarea
+                      className="form-textarea"
+                      rows={2}
+                      defaultValue={elem.description}
+                      id={`world-desc-${elem.id}`}
+                    />
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button
+                        className="btn-save"
+                        onClick={() => {
+                          const category = (
                             document.getElementById(
-                              `event-order-${event.id}`
+                              `world-cat-${elem.id}`
+                            ) as HTMLSelectElement
+                          ).value;
+                          const desc = (
+                            document.getElementById(
+                              `world-desc-${elem.id}`
+                            ) as HTMLTextAreaElement
+                          ).value;
+                          handleUpdateWorldElement(elem.id, category, desc);
+                        }}
+                      >
+                        Save
+                      </button>
+                      <button
+                        className="btn-cancel"
+                        onClick={() => setEditingWorldId(null)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span>
+                      <strong>{elem.category}:</strong> {elem.description}
+                    </span>
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button
+                        className="btn-edit"
+                        onClick={() => setEditingWorldId(elem.id)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="btn-delete"
+                        onClick={() => handleDeleteWorldElement(elem.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </li>
+            ))}
+            {worldElements.length === 0 && (
+              <li className="no-items">No world building elements yet.</li>
+            )}
+          </ul>
+        </CollapsibleSection>
+
+        {/* Characters Section - Collapsible */}
+        <CollapsibleSection title="Characters" icon="👤" badge={characters.length} defaultExpanded={false}>
+          <div className="add-form">
+            <label className="form-label">Name:</label>
+            <input
+              type="text"
+              className="form-input"
+              value={newCharName}
+              onChange={(e) => setNewCharName(e.target.value)}
+            />
+            <label className="form-label">Traits:</label>
+            <textarea
+              className="form-textarea"
+              rows={2}
+              value={newCharTraits}
+              onChange={(e) => setNewCharTraits(e.target.value)}
+            />
+            <label className="form-label">Backstory:</label>
+            <textarea
+              className="form-textarea"
+              rows={2}
+              value={newCharBackstory}
+              onChange={(e) => setNewCharBackstory(e.target.value)}
+            />
+            <button className="btn-add" onClick={handleAddCharacter}>
+              Add Character
+            </button>
+          </div>
+          <ul className="item-list">
+            {characters.map((char) => (
+              <li
+                key={char.id}
+                className="item"
+                style={{ flexDirection: "column", alignItems: "stretch" }}
+              >
+                {editingCharId === char.id ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.5rem",
+                    }}
+                  >
+                    <label className="form-label">Name:</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      defaultValue={char.name}
+                      id={`char-name-${char.id}`}
+                    />
+                    <label className="form-label">Traits:</label>
+                    <textarea
+                      className="form-textarea"
+                      rows={2}
+                      defaultValue={char.traits || ""}
+                      id={`char-traits-${char.id}`}
+                    />
+                    <label className="form-label">Backstory:</label>
+                    <textarea
+                      className="form-textarea"
+                      rows={2}
+                      defaultValue={char.backstory || ""}
+                      id={`char-back-${char.id}`}
+                    />
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button
+                        className="btn-save"
+                        onClick={() => {
+                          const name = (
+                            document.getElementById(
+                              `char-name-${char.id}`
                             ) as HTMLInputElement
-                          ).value
-                        );
-                        const desc = (
-                          document.getElementById(
-                            `event-desc-${event.id}`
-                          ) as HTMLTextAreaElement
-                        ).value;
-                        handleUpdateKeyEvent(event.id, desc, order);
+                          ).value;
+                          const traits = (
+                            document.getElementById(
+                              `char-traits-${char.id}`
+                            ) as HTMLTextAreaElement
+                          ).value;
+                          const backstory = (
+                            document.getElementById(
+                              `char-back-${char.id}`
+                            ) as HTMLTextAreaElement
+                          ).value;
+                          handleUpdateCharacter(char.id, name, traits, backstory);
+                        }}
+                      >
+                        Save
+                      </button>
+                      <button
+                        className="btn-cancel"
+                        onClick={() => setEditingCharId(null)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column" }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
                       }}
                     >
-                      Save
-                    </button>
-                    <button
-                      className="btn-cancel"
-                      onClick={() => setEditingEventId(null)}
-                    >
-                      Cancel
-                    </button>
+                      <strong>{char.name}</strong>
+                      <div style={{ display: "flex", gap: "0.5rem" }}>
+                        <button
+                          className="btn-edit"
+                          onClick={() => setEditingCharId(char.id)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="btn-delete"
+                          onClick={() => handleDeleteCharacter(char.id)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                    {char.traits && (
+                      <div className="item-detail">Traits: {char.traits}</div>
+                    )}
+                    {char.backstory && (
+                      <div className="item-detail">
+                        Backstory: {char.backstory}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ) : (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <span>
-                    {event.order}. {event.description}
-                  </span>
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
-                    <button
-                      className="btn-edit"
-                      onClick={() => setEditingEventId(event.id)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="btn-delete"
-                      onClick={() => handleDeleteKeyEvent(event.id)}
-                    >
-                      Delete
-                    </button>
+                )}
+              </li>
+            ))}
+            {characters.length === 0 && (
+              <li className="no-items">No characters yet.</li>
+            )}
+          </ul>
+        </CollapsibleSection>
+
+        {/* Key Events Section - Collapsible */}
+        <CollapsibleSection title="Key Events" icon="📅" badge={keyEvents.length} defaultExpanded={false}>
+          <div className="add-form">
+            <label className="form-label">Description:</label>
+            <textarea
+              className="form-textarea"
+              rows={2}
+              value={newEventDesc}
+              onChange={(e) => setNewEventDesc(e.target.value)}
+            />
+            <label className="form-label">Order:</label>
+            <input
+              type="number"
+              className="form-input-small"
+              value={newEventOrder}
+              onChange={(e) => setNewEventOrder(parseInt(e.target.value))}
+            />
+            <button className="btn-add" onClick={handleAddKeyEvent}>
+              Add Key Event
+            </button>
+          </div>
+          <ul className="item-list">
+            {keyEvents.map((event) => (
+              <li
+                key={event.id}
+                className="item"
+                style={{ flexDirection: "column", alignItems: "stretch" }}
+              >
+                {editingEventId === event.id ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "0.5rem",
+                    }}
+                  >
+                    <label className="form-label">Order:</label>
+                    <input
+                      type="number"
+                      className="form-input-small"
+                      defaultValue={event.order}
+                      id={`event-order-${event.id}`}
+                    />
+                    <label className="form-label">Description:</label>
+                    <textarea
+                      className="form-textarea"
+                      rows={2}
+                      defaultValue={event.description}
+                      id={`event-desc-${event.id}`}
+                    />
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button
+                        className="btn-save"
+                        onClick={() => {
+                          const order = parseInt(
+                            (
+                              document.getElementById(
+                                `event-order-${event.id}`
+                              ) as HTMLInputElement
+                            ).value
+                          );
+                          const desc = (
+                            document.getElementById(
+                              `event-desc-${event.id}`
+                            ) as HTMLTextAreaElement
+                          ).value;
+                          handleUpdateKeyEvent(event.id, desc, order);
+                        }}
+                      >
+                        Save
+                      </button>
+                      <button
+                        className="btn-cancel"
+                        onClick={() => setEditingEventId(null)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </li>
-          ))}
-          {keyEvents.length === 0 && (
-            <li className="no-items">No key events yet.</li>
-          )}
-        </ul>
+                ) : (
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span>
+                      {event.order}. {event.description}
+                    </span>
+                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                      <button
+                        className="btn-edit"
+                        onClick={() => setEditingEventId(event.id)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="btn-delete"
+                        onClick={() => handleDeleteKeyEvent(event.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </li>
+            ))}
+            {keyEvents.length === 0 && (
+              <li className="no-items">No key events yet.</li>
+            )}
+          </ul>
+        </CollapsibleSection>
 
-        <hr className="section-divider" />
-
-        {/* AI Context Inspector - Moved to bottom as troubleshooting tool */}
-        <div
-          className="ai-generator"
-          style={{
-            marginBottom: "1.5rem",
-            background: "var(--color-bg-tertiary, #252541)",
-            padding: "1rem",
-            borderRadius: "0.5rem",
-          }}
-        >
-          <h3 className="generator-title">
-            📋 AI Context Inspector (Troubleshooting)
-          </h3>
+        {/* AI Context Inspector - Collapsible */}
+        <CollapsibleSection title="AI Context Inspector (Debug)" icon="🔧" defaultExpanded={false}>
           <p
             style={{
               color: "var(--color-text-secondary, #9ca3af)",
@@ -1362,8 +1564,7 @@ export function StoryEditor() {
               fontSize: "0.875rem",
             }}
           >
-            This shows what data the AI generators have access to for this
-            chapter:
+            This shows the exact data the AI generators receive:
           </p>
           <div
             style={{
@@ -1373,6 +1574,8 @@ export function StoryEditor() {
               fontSize: "0.875rem",
               fontFamily: "monospace",
               overflowX: "auto",
+              maxHeight: "400px",
+              overflow: "auto",
             }}
           >
             <pre
@@ -1385,40 +1588,26 @@ export function StoryEditor() {
               {`Story: ${story.title}
 Current Chapter: ${currentChapter?.title || "None"}
 
-Characters (${characters.length}):
-${
-  characters
-    .map(
-      (c) =>
-        `  - ${c.name}${c.traits ? `\n    Traits: ${c.traits}` : ""}${
-          c.backstory ? `\n    Backstory: ${c.backstory}` : ""
-        }`
-    )
-    .join("\n") || "  (none)"
-}
+=== CHARACTERS (${characters.length}) ===
+${characterContextString}
 
-Beats/Scenes (${beats.length}):
-${beats.map((b) => `  ${b.order}. ${b.description}`).join("\n") || "  (none)"}
+=== BEATS/SCENES (${beats.length}) ===
+${beats.map((b) => `${b.order}. ${b.description}`).join("\n") || "(none)"}
 
-World Building Elements (${worldElements.length}):
-${
-  worldElements.map((w) => `  [${w.category}] ${w.description}`).join("\n") ||
-  "  (none)"
-}
+=== WORLD BUILDING (${worldElements.length}) ===
+${worldElements.map((w) => `[${w.category}] ${w.description}`).join("\n") || "(none)"}
 
-Key Events (${keyEvents.length}):
-${
-  keyEvents.map((e) => `  ${e.order}. ${e.description}`).join("\n") ||
-  "  (none)"
-}
+=== KEY EVENTS (${keyEvents.length}) ===
+${keyEvents.map((e) => `${e.order}. ${e.description}`).join("\n") || "(none)"}
 
-Chapter Text (${(currentChapter?.text || "").length} chars):
-${(currentChapter?.text || "(empty)").substring(0, 200)}${
-                (currentChapter?.text || "").length > 200 ? "..." : ""
-              }`}
+=== CHAPTER SUMMARY ===
+${currentChapter?.summary || "(no summary)"}
+
+=== CHAPTER TEXT (${(currentChapter?.text || "").length} chars) ===
+${(currentChapter?.text || "(empty)").substring(0, 500)}${(currentChapter?.text || "").length > 500 ? "...(truncated)" : ""}`}
             </pre>
           </div>
-        </div>
+        </CollapsibleSection>
       </div>
     </div>
   );

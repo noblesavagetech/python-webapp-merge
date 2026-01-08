@@ -257,3 +257,168 @@
   color: var(--color-text-muted);
   line-height: 1.5;
 }
+
+/* Collapsible Sections for Context Panel */
+.context-collapsible {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+}
+
+.context-collapsible-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: none;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-align: left;
+  transition: background 0.2s;
+}
+
+.context-collapsible-header:hover {
+  background: rgba(139, 92, 246, 0.1);
+}
+
+.context-collapsible-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.context-badge {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  font-size: 0.7rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 1rem;
+  font-weight: 400;
+}
+
+.context-collapsible-arrow {
+  font-size: 0.65rem;
+  color: var(--color-text-secondary);
+}
+
+.context-collapsible-content {
+  padding: 1rem;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-primary);
+}
+
+/* Markdown Section */
+.markdown-section {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.markdown-files-list {
+  padding: 0 1rem 1rem 1rem;
+  overflow-y: auto;
+}
+
+.markdown-content {
+  background: var(--color-bg-secondary);
+  padding: 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+}
+
+.markdown-content .md-h1 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 1rem 0 0.5rem 0;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 0.25rem;
+}
+
+.markdown-content .md-h2 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0.75rem 0 0.4rem 0;
+}
+
+.markdown-content .md-h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0.5rem 0 0.25rem 0;
+}
+
+.markdown-content .md-p {
+  color: var(--color-text-secondary);
+  margin: 0.25rem 0;
+}
+
+.markdown-content .md-li {
+  color: var(--color-text-secondary);
+  margin-left: 1.5rem;
+  list-style-type: disc;
+}
+
+.markdown-content .md-li-ordered {
+  color: var(--color-text-secondary);
+  margin-left: 1.5rem;
+  list-style-type: decimal;
+}
+
+.markdown-content code {
+  background: var(--color-bg-tertiary);
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+
+.markdown-content strong {
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.markdown-content em {
+  font-style: italic;
+}
+
+.markdown-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.md-action-btn {
+  padding: 0.4rem 0.75rem;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.md-action-btn:hover {
+  background: var(--color-accent);
+  color: white;
+  border-color: var(--color-accent);
+}
+
+.md-action-btn--danger:hover {
+  background: var(--color-error);
+  border-color: var(--color-error);
+}

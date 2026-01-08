@@ -23,13 +23,58 @@ interface ContextFile {
   size: number;
 }
 
+interface MarkdownFile {
+  filename: string;
+  content: string;
+  size: number;
+  expanded: boolean;
+}
+
+// Collapsible Section Component
+function CollapsibleSection({ 
+  title, 
+  children, 
+  defaultExpanded = false,
+  badge,
+  onToggle
+}: { 
+  title: string; 
+  children: React.ReactNode; 
+  defaultExpanded?: boolean;
+  badge?: string | number;
+  onToggle?: (expanded: boolean) => void;
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  
+  const handleToggle = () => {
+    const newExpanded = !expanded;
+    setExpanded(newExpanded);
+    onToggle?.(newExpanded);
+  };
+  
+  return (
+    <div className={`context-collapsible ${expanded ? 'expanded' : 'collapsed'}`}>
+      <button className="context-collapsible-header" onClick={handleToggle} type="button">
+        <span className="context-collapsible-title">
+          {title}
+          {badge !== undefined && <span className="context-badge">{badge}</span>}
+        </span>
+        <span className="context-collapsible-arrow">{expanded ? '▼' : '▶'}</span>
+      </button>
+      {expanded && <div className="context-collapsible-content">{children}</div>}
+    </div>
+  );
+}
+
 function ContextPanel({ memories, onRemoveMemory, projectId }: ContextPanelProps) {
   const [trainedFiles, setTrainedFiles] = useState<FileUpload[]>([]);
   const [contextFiles, setContextFiles] = useState<ContextFile[]>([]);
+  const [markdownFiles, setMarkdownFiles] = useState<MarkdownFile[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'memories' | 'trained' | 'context'>('memories');
+  const [activeTab, setActiveTab] = useState<'memories' | 'trained' | 'context' | 'markdown'>('memories');
   const trainInputRef = useRef<HTMLInputElement>(null);
   const contextInputRef = useRef<HTMLInputElement>(null);
+  const markdownInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (projectId && activeTab === 'trained') {
@@ -133,6 +178,86 @@ function ContextPanel({ memories, onRemoveMemory, projectId }: ContextPanelProps
     setContextFiles(prev => prev.filter(f => f.filename !== filename));
   };
 
+  // Markdown file handlers
+  const handleMarkdownUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Only allow .md files
+    if (!file.name.endsWith('.md')) {
+      alert('Please select a Markdown (.md) file');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const content = await file.text();
+      setMarkdownFiles(prev => [...prev, {
+        filename: file.name,
+        content,
+        size: file.size,
+        expanded: false
+      }]);
+      if (markdownInputRef.current) {
+        markdownInputRef.current.value = '';
+      }
+      alert(`✓ Loaded markdown file: ${file.name}`);
+    } catch (error) {
+      console.error('Failed to read markdown file:', error);
+      alert('Failed to read markdown file');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeleteMarkdown = (filename: string) => {
+    if (!confirm('Remove this markdown file from context?')) return;
+    setMarkdownFiles(prev => prev.filter(f => f.filename !== filename));
+  };
+
+  const toggleMarkdownExpanded = (filename: string) => {
+    setMarkdownFiles(prev => prev.map(f => 
+      f.filename === filename ? { ...f, expanded: !f.expanded } : f
+    ));
+  };
+
+  // Simple markdown renderer
+  const renderMarkdown = (content: string) => {
+    // Very basic markdown rendering
+    const lines = content.split('\n');
+    return lines.map((line, i) => {
+      // Headers
+      if (line.startsWith('### ')) {
+        return <h4 key={i} className="md-h3">{line.slice(4)}</h4>;
+      }
+      if (line.startsWith('## ')) {
+        return <h3 key={i} className="md-h2">{line.slice(3)}</h3>;
+      }
+      if (line.startsWith('# ')) {
+        return <h2 key={i} className="md-h1">{line.slice(2)}</h2>;
+      }
+      // Bold
+      let processed = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+      // Italic
+      processed = processed.replace(/\*(.+?)\*/g, '<em>$1</em>');
+      // Code
+      processed = processed.replace(/`(.+?)`/g, '<code>$1</code>');
+      // Lists
+      if (line.startsWith('- ')) {
+        return <li key={i} className="md-li" dangerouslySetInnerHTML={{ __html: processed.slice(2) }} />;
+      }
+      if (/^\d+\.\s/.test(line)) {
+        return <li key={i} className="md-li-ordered" dangerouslySetInnerHTML={{ __html: processed.replace(/^\d+\.\s/, '') }} />;
+      }
+      // Empty lines
+      if (line.trim() === '') {
+        return <br key={i} />;
+      }
+      // Regular paragraph
+      return <p key={i} className="md-p" dangerouslySetInnerHTML={{ __html: processed }} />;
+    });
+  };
+
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
@@ -160,6 +285,12 @@ function ContextPanel({ memories, onRemoveMemory, projectId }: ContextPanelProps
             onClick={() => setActiveTab('context')}
           >
             📄 Context
+          </button>
+          <button 
+            className={`tab ${activeTab === 'markdown' ? 'active' : ''}`}
+            onClick={() => setActiveTab('markdown')}
+          >
+            📝 Markdown
           </button>
         </div>
       </div>
@@ -298,6 +429,71 @@ function ContextPanel({ memories, onRemoveMemory, projectId }: ContextPanelProps
                       ×
                     </button>
                   </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'markdown' && (
+          <div className="markdown-section">
+            <div className="section-header">
+              <p className="section-hint">
+                Load .md files to use as interactive context. View and reference them while writing.
+              </p>
+              <input
+                ref={markdownInputRef}
+                type="file"
+                onChange={handleMarkdownUpload}
+                style={{ display: 'none' }}
+                accept=".md"
+              />
+              <button 
+                className="upload-btn"
+                onClick={() => markdownInputRef.current?.click()}
+                disabled={uploading}
+              >
+                {uploading ? '⏳ Loading...' : '+ Load .md File'}
+              </button>
+            </div>
+            {markdownFiles.length === 0 ? (
+              <div className="empty-state">
+                <span>No markdown files loaded</span>
+                <p>Load .md files to use as reference while writing</p>
+              </div>
+            ) : (
+              <div className="markdown-files-list">
+                {markdownFiles.map(file => (
+                  <CollapsibleSection
+                    key={file.filename}
+                    title={file.filename}
+                    badge={formatFileSize(file.size)}
+                    defaultExpanded={file.expanded}
+                    onToggle={() => toggleMarkdownExpanded(file.filename)}
+                  >
+                    <div className="markdown-content">
+                      {renderMarkdown(file.content)}
+                    </div>
+                    <div className="markdown-actions">
+                      <button 
+                        className="md-action-btn"
+                        onClick={() => {
+                          navigator.clipboard.writeText(file.content);
+                          alert('Content copied to clipboard!');
+                        }}
+                        title="Copy raw content"
+                      >
+                        📋 Copy Raw
+                      </button>
+                      <button 
+                        className="md-action-btn md-action-btn--danger"
+                        onClick={() => handleDeleteMarkdown(file.filename)}
+                        title="Remove file"
+                      >
+                        🗑️ Remove
+                      </button>
+                    </div>
+                  </CollapsibleSection>
                 ))}
               </div>
             )}

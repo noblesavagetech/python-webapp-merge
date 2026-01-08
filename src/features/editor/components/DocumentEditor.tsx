@@ -1,12 +1,4 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { 
-  DocumentWithRevisions, 
-  createRevision, 
-  acceptAllRevisions,
-  rejectAllRevisions,
-  getFinalContent,
-  buildTextSpans
-} from '../../../utils/revisions';
 import { SelectionPopup } from './SelectionPopup';
 import { apiService } from '../../../services/api';
 import './DocumentEditor.css';
@@ -21,17 +13,21 @@ interface DocumentEditorProps {
   projectId: number | null;
 }
 
+interface PendingChange {
+  id: string;
+  originalText: string;
+  newText: string;
+  range: { start: number; end: number };
+  timestamp: number;
+}
+
 function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel, projectId, partner }: DocumentEditorProps) {
   const [localContent, setLocalContent] = useState(content);
-  const editorRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<HTMLTextAreaElement>(null);
   const isUpdatingRef = useRef(false);
   
-  // Revision state
-  const [revisionDoc, setRevisionDoc] = useState<DocumentWithRevisions>({
-    baseContent: content,
-    revisions: [],
-    activeRevisionId: null,
-  });
+  // Simple pending change - only one at a time for clarity
+  const [pendingChange, setPendingChange] = useState<PendingChange | null>(null);
   
   // Selection popup state
   const [showPopup, setShowPopup] = useState(false);
@@ -46,144 +42,53 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
   const lastExternalContentRef = useRef(content);
 
   useEffect(() => {
-    // Only update if content changed from external source (not from our own edits)
-    // AND there are no pending revisions (to avoid overwriting revision state)
-    if (content !== lastExternalContentRef.current && !isUpdatingRef.current && revisionDoc.revisions.length === 0) {
+    // Only update if content changed from external source AND no pending changes
+    if (content !== lastExternalContentRef.current && !isUpdatingRef.current && !pendingChange) {
       lastExternalContentRef.current = content;
       setLocalContent(content);
-      setRevisionDoc(prev => ({
-        ...prev,
-        baseContent: content,
-      }));
-      
-      // Update editor
-      if (editorRef.current) {
-        editorRef.current.textContent = content;
-      }
     }
-  }, [content, revisionDoc.revisions.length]);
+  }, [content, pendingChange]);
 
-  // Generate ghost suggestion (disabled in revision mode for now)
-  // const generateGhostSuggestion = useCallback(async (text: string, cursorPosition: number) => {
-  //   const textBeforeCursor = text.substring(0, cursorPosition);
-  //   const words = textBeforeCursor.split(/\s+/);
-  //   const contextWords = words.slice(-2000);
-  //   const contextText = contextWords.join(' ');
-  //   
-  //   const lastChar = textBeforeCursor[textBeforeCursor.length - 1];
-  //   if (lastChar && !/[\s.,;!?]/.test(lastChar)) {
-  //     return null;
-  //   }
-  //   
-  //   if (!projectId) {
-  //     return null;
-  //   }
-  //   
-  //   try {
-  //     const suggestion = await apiService.getGhostSuggestion({
-  //       text: contextText,
-  //       cursorPosition: contextText.length,
-  //       purpose,
-  //       model: selectedModel,
-  //       projectId,
-  //     });
-  //     
-  //     if (suggestion && suggestion.trim()) {
-  //       return {
-  //         text: suggestion,
-  //         position: cursorPosition,
-  //       };
-  //     }
-  //   } catch (error) {
-  //     console.error('Ghost suggestion error:', error);
-  //   }
-  //   return null;
-  // }, [purpose, selectedModel, projectId]);
-
-  // Build HTML string for contenteditable with inline revisions
-  const buildEditorHTML = useCallback(() => {
-    const spans = buildTextSpans(revisionDoc.baseContent, revisionDoc.revisions);
-    
-    return spans.map((span) => {
-      const escapedText = span.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      
-      if (span.type === 'deleted') {
-        return `<span class="text-span text-span--deleted" contenteditable="false">${escapedText}</span>`;
-      } else if (span.type === 'inserted') {
-        const revision = revisionDoc.revisions.find(r => r.newSpan?.id === span.id);
-        const buttons = revision 
-          ? `<span class="revision-actions" contenteditable="false">
-               <button class="revision-action revision-action--accept" data-revision-id="${revision.id}" data-action="accept">✓</button>
-               <button class="revision-action revision-action--reject" data-revision-id="${revision.id}" data-action="reject">✗</button>
-             </span>`
-          : '';
-        return `<span class="text-span text-span--inserted" contenteditable="false">${escapedText}${buttons}</span>`;
-      } else {
-        return escapedText;
-      }
-    }).join('');
-  }, [revisionDoc]);
-
-  // Handle content editable input
-  const handleContentInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
-    const newText = e.currentTarget.textContent || '';
+  // Handle textarea input - simple direct editing
+  const handleContentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newContent = e.target.value;
     
     isUpdatingRef.current = true;
+    setLocalContent(newContent);
+    onChange(newContent);
     
-    // Only update base content if there are no pending revisions
-    if (revisionDoc.revisions.length === 0) {
-      setLocalContent(newText);
-      setRevisionDoc(prev => ({
-        ...prev,
-        baseContent: newText,
-      }));
-      onChange(newText);
+    // Clear pending change if user edits manually
+    if (pendingChange) {
+      setPendingChange(null);
     }
     
     setTimeout(() => {
       isUpdatingRef.current = false;
     }, 100);
-  }, [revisionDoc.revisions.length, onChange]);
-
-  // Handle clicks on revision action buttons
-  const handleEditorClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement;
-    if (target.classList.contains('revision-action')) {
-      e.preventDefault();
-      const revisionId = target.getAttribute('data-revision-id');
-      const action = target.getAttribute('data-action');
-      
-      if (revisionId && action === 'accept') {
-        handleAcceptRevision(revisionId);
-      } else if (revisionId && action === 'reject') {
-        handleRejectRevision(revisionId);
-      }
-    }
-  }, []);
+  }, [onChange, pendingChange]);
 
   // Handle selection
   const handleSelect = useCallback(() => {
-    const selection = window.getSelection();
-    if (!selection || !editorRef.current) return;
+    if (!editorRef.current) return;
     
-    const selectedText = selection.toString().trim();
-    if (selectedText && selectedText.length > 0) {
-      const range = selection.getRangeAt(0);
+    const textarea = editorRef.current;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    
+    if (start !== end) {
+      const selectedText = localContent.substring(start, end);
       
-      // Calculate position for popup
-      const rect = range.getBoundingClientRect();
-      const popupX = rect.left + (rect.width / 2);
-      const popupY = rect.bottom + window.scrollY + 8;
+      // Get position for popup
+      const rect = textarea.getBoundingClientRect();
+      const lineHeight = parseInt(getComputedStyle(textarea).lineHeight) || 20;
+      const textBeforeSelection = localContent.substring(0, start);
+      const linesBeforeSelection = textBeforeSelection.split('\n').length;
       
-      // Calculate position in document
-      const preSelectionRange = range.cloneRange();
-      preSelectionRange.selectNodeContents(editorRef.current);
-      preSelectionRange.setEnd(range.startContainer, range.startOffset);
-      const start = preSelectionRange.toString().length;
-      const end = start + selectedText.length;
+      const popupX = rect.left + rect.width / 2;
+      const popupY = rect.top + (linesBeforeSelection * lineHeight) + window.scrollY + 40;
       
       setSelectedTextInfo({ text: selectedText, range: { start, end } });
-      setPopupPosition({ x: popupX, y: popupY });
+      setPopupPosition({ x: popupX, y: Math.min(popupY, rect.bottom + window.scrollY) });
       setShowPopup(true);
       
       onSelection(selectedText, { start, end });
@@ -191,159 +96,57 @@ function DocumentEditor({ content, onChange, onSelection, purpose, selectedModel
       setSelectedTextInfo(null);
       onSelection('', null);
     }
-  }, [onSelection, showPopup]);
+  }, [localContent, onSelection, showPopup]);
 
-  // Revision handlers
-  const handleAcceptRevision = useCallback((revisionId: string) => {
-    const revision = revisionDoc.revisions.find(r => r.id === revisionId);
-    if (!revision || !editorRef.current) return;
+  // Apply AI suggestion directly
+  const applyChange = useCallback((startPos: number, endPos: number, newText: string) => {
+    const before = localContent.substring(0, startPos);
+    const after = localContent.substring(endPos);
+    const updatedContent = before + newText + after;
     
-    // Simple: apply the change to base content
-    const before = revisionDoc.baseContent.substring(0, revision.originalSpan.startPos);
-    const after = revisionDoc.baseContent.substring(revision.originalSpan.endPos);
-    const newText = revision.newSpan?.text || '';
-    const newContent = before + newText + after;
+    setLocalContent(updatedContent);
+    lastExternalContentRef.current = updatedContent;
+    onChange(updatedContent);
     
-    // Remove this revision from the list
-    const updated = {
-      ...revisionDoc,
-      baseContent: newContent,
-      revisions: revisionDoc.revisions.filter(r => r.id !== revisionId),
-    };
-    
-    setRevisionDoc(updated);
-    setLocalContent(newContent);
-    lastExternalContentRef.current = newContent; // Prevent useEffect from reverting
-    onChange(newContent);
-    
-    // Update editor using the updated doc, not stale closure
-    if (updated.revisions.length === 0) {
-      editorRef.current.textContent = newContent;
-    } else {
-      const spans = buildTextSpans(updated.baseContent, updated.revisions);
-      editorRef.current.innerHTML = spans.map((span) => {
-        const escapedText = span.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        
-        if (span.type === 'deleted') {
-          return `<span class="text-span text-span--deleted" contenteditable="false">${escapedText}</span>`;
-        } else if (span.type === 'inserted') {
-          const revision = updated.revisions.find(r => r.newSpan?.id === span.id);
-          const buttons = revision 
-            ? `<span class="revision-actions" contenteditable="false">
-                 <button class="revision-action revision-action--accept" data-revision-id="${revision.id}" data-action="accept">✓</button>
-                 <button class="revision-action revision-action--reject" data-revision-id="${revision.id}" data-action="reject">✗</button>
-               </span>`
-            : '';
-          return `<span class="text-span text-span--inserted" contenteditable="false">${escapedText}${buttons}</span>`;
-        } else {
-          return escapedText;
-        }
-      }).join('');
-    }
-  }, [revisionDoc, onChange]);
-  
-  const handleRejectRevision = useCallback((revisionId: string) => {
-    if (!editorRef.current) return;
-    
-    // Just remove the revision - keep baseContent unchanged (that's the whole point of reject!)
-    const updated = {
-      ...revisionDoc,
-      revisions: revisionDoc.revisions.filter(r => r.id !== revisionId),
-    };
-    
-    setRevisionDoc(updated);
-    // DO NOT call onChange here - rejecting means keeping the original content
-    // The baseContent already IS the correct content
-    
-    // Update editor display
-    if (updated.revisions.length === 0) {
-      // No more revisions - show plain baseContent
-      editorRef.current.textContent = updated.baseContent;
-      setLocalContent(updated.baseContent);
-    } else {
-      // Still have other revisions - rebuild the HTML
-      const spans = buildTextSpans(updated.baseContent, updated.revisions);
-      editorRef.current.innerHTML = spans.map((span) => {
-        const escapedText = span.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        
-        if (span.type === 'deleted') {
-          return `<span class="text-span text-span--deleted" contenteditable="false">${escapedText}</span>`;
-        } else if (span.type === 'inserted') {
-          const revision = updated.revisions.find(r => r.newSpan?.id === span.id);
-          const buttons = revision 
-            ? `<span class="revision-actions" contenteditable="false">
-                 <button class="revision-action revision-action--accept" data-revision-id="${revision.id}" data-action="accept">✓</button>
-                 <button class="revision-action revision-action--reject" data-revision-id="${revision.id}" data-action="reject">✗</button>
-               </span>`
-            : '';
-          return `<span class="text-span text-span--inserted" contenteditable="false">${escapedText}${buttons}</span>`;
-        } else {
-          return escapedText;
-        }
-      }).join('');
-    }
-  }, [revisionDoc]);
-  
-  const handleAcceptAll = useCallback(() => {
-    const updated = acceptAllRevisions(revisionDoc);
-    setRevisionDoc(updated);
-    const finalContent = getFinalContent(updated);
-    onChange(finalContent);
-    
-    // Force re-render
+    // Move cursor to end of inserted text
     if (editorRef.current) {
-      editorRef.current.innerHTML = buildEditorHTML();
+      const newCursorPos = startPos + newText.length;
+      setTimeout(() => {
+        editorRef.current?.setSelectionRange(newCursorPos, newCursorPos);
+        editorRef.current?.focus();
+      }, 10);
     }
-  }, [revisionDoc, onChange, buildEditorHTML]);
-  
-  const handleRejectAll = useCallback(() => {
-    const updated = rejectAllRevisions(revisionDoc);
-    setRevisionDoc(updated);
+  }, [localContent, onChange]);
+
+  // Create a pending change for preview
+  const createPendingChange = useCallback((startPos: number, endPos: number, newText: string) => {
+    const originalText = localContent.substring(startPos, endPos);
     
-    // Force re-render
-    if (editorRef.current) {
-      editorRef.current.innerHTML = buildEditorHTML();
-    }
-  }, [revisionDoc, buildEditorHTML]);
-  
-  // Public API to apply a revision from outside (e.g., from AI chat)
-  const applyRevision = useCallback((startPos: number, endPos: number, newText: string) => {
-    if (!editorRef.current) return;
+    setPendingChange({
+      id: `change_${Date.now()}`,
+      originalText,
+      newText,
+      range: { start: startPos, end: endPos },
+      timestamp: Date.now(),
+    });
+  }, [localContent]);
+
+  // Accept pending change
+  const acceptPendingChange = useCallback(() => {
+    if (!pendingChange) return;
     
-    // Create revision using the CURRENT baseContent, not the editor's display content
-    const revision = createRevision(revisionDoc.baseContent, startPos, endPos, newText);
-    
-    const updatedDoc = {
-      ...revisionDoc,
-      // NEVER modify baseContent when adding a revision - it stays unchanged!
-      revisions: [...revisionDoc.revisions, revision],
-      activeRevisionId: revision.id,
-    };
-    
-    setRevisionDoc(updatedDoc);
-    
-    // Update editor display with revisions
-    const html = buildTextSpans(updatedDoc.baseContent, updatedDoc.revisions).map((span) => {
-      const escapedText = span.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      
-      if (span.type === 'deleted') {
-        return `<span class="text-span text-span--deleted" contenteditable="false">${escapedText}</span>`;
-      } else if (span.type === 'inserted') {
-        const rev = updatedDoc.revisions.find(r => r.newSpan?.id === span.id);
-        const buttons = rev 
-          ? `<span class="revision-actions" contenteditable="false">
-               <button class="revision-action revision-action--accept" data-revision-id="${rev.id}" data-action="accept">✓</button>
-               <button class="revision-action revision-action--reject" data-revision-id="${rev.id}" data-action="reject">✗</button>
-             </span>`
-          : '';
-        return `<span class="text-span text-span--inserted" contenteditable="false">${escapedText}${buttons}</span>`;
-      } else {
-        return escapedText;
-      }
-    }).join('');
-    
-    editorRef.current.innerHTML = html;
-  }, [revisionDoc]);
+    applyChange(pendingChange.range.start, pendingChange.range.end, pendingChange.newText);
+    setPendingChange(null);
+    setShowPopup(false);
+    setSelectedTextInfo(null);
+  }, [pendingChange, applyChange]);
+
+  // Reject pending change
+  const rejectPendingChange = useCallback(() => {
+    setPendingChange(null);
+    setShowPopup(false);
+    setSelectedTextInfo(null);
+  }, []);
   
   // Handle selection popup submission
   const handlePopupSubmit = useCallback(async (instruction: string) => {
@@ -373,9 +176,9 @@ Instruction: ${instruction}`;
         aiResponse += chunk;
       }
       
-      // Apply the AI's response as a revision
+      // Create pending change for preview
       if (aiResponse.trim()) {
-        applyRevision(
+        createPendingChange(
           selectedTextInfo.range.start,
           selectedTextInfo.range.end,
           aiResponse.trim()
@@ -383,64 +186,76 @@ Instruction: ${instruction}`;
       }
       
       setShowPopup(false);
-      setSelectedTextInfo(null);
     } catch (error) {
       console.error('Error generating AI response:', error);
       alert('Failed to generate AI response. Please try again.');
     } finally {
       setIsGenerating(false);
     }
-  }, [selectedTextInfo, projectId, localContent, purpose, partner, selectedModel, applyRevision]);
+  }, [selectedTextInfo, projectId, localContent, purpose, partner, selectedModel, createPendingChange]);
   
   const handlePopupClose = useCallback(() => {
     setShowPopup(false);
     setSelectedTextInfo(null);
   }, []);
   
-  // Expose applyRevision method to parent components
+  // Expose applyChange method to parent components
   useEffect(() => {
-    (window as any).__editorApplyRevision = applyRevision;
+    (window as any).__editorApplyRevision = (startPos: number, endPos: number, newText: string) => {
+      createPendingChange(startPos, endPos, newText);
+    };
     
     return () => {
       delete (window as any).__editorApplyRevision;
     };
-  }, [applyRevision]);
+  }, [createPendingChange]);
 
-  // Initialize editor content on mount
-  useEffect(() => {
-    if (editorRef.current && !editorRef.current.textContent) {
-      editorRef.current.textContent = content;
-    }
-  }, []);
+  const wordCount = localContent.split(/\s+/).filter(Boolean).length;
+  const charCount = localContent.length;
 
-  const finalContent = getFinalContent(revisionDoc);
-  const wordCount = finalContent.split(/\s+/).filter(Boolean).length;
-  const charCount = finalContent.length;
-  const pendingRevisions = revisionDoc.revisions.filter(r => r.status === 'pending').length;
+  // Build preview content with inline diff if there's a pending change
+  const renderContentWithDiff = () => {
+    if (!pendingChange) return null;
+    
+    const { range, originalText, newText } = pendingChange;
+    const before = localContent.substring(0, range.start);
+    const after = localContent.substring(range.end);
+    
+    return (
+      <div className="diff-preview">
+        <div className="diff-header">
+          <span className="diff-title">📝 Proposed Change</span>
+          <div className="diff-actions">
+            <button 
+              className="diff-btn diff-btn--accept" 
+              onClick={acceptPendingChange}
+              title="Accept this change"
+            >
+              ✓ Accept
+            </button>
+            <button 
+              className="diff-btn diff-btn--reject" 
+              onClick={rejectPendingChange}
+              title="Reject this change"
+            >
+              ✗ Reject
+            </button>
+          </div>
+        </div>
+        <div className="diff-content">
+          <span className="diff-context">{before.slice(-100)}</span>
+          <span className="diff-deleted">{originalText}</span>
+          <span className="diff-inserted">{newText}</span>
+          <span className="diff-context">{after.slice(0, 100)}</span>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="document-editor">
       <div className="editor-toolbar">
         <div className="toolbar-group">
-          {pendingRevisions > 0 && (
-            <>
-              <button 
-                className="toolbar-btn toolbar-btn--success" 
-                onClick={handleAcceptAll}
-                title="Accept all changes"
-              >
-                ✓ All
-              </button>
-              <button 
-                className="toolbar-btn toolbar-btn--danger" 
-                onClick={handleRejectAll}
-                title="Reject all changes"
-              >
-                ✗ All
-              </button>
-              <div className="toolbar-divider"></div>
-            </>
-          )}
           <button className="toolbar-btn" title="Bold (Ctrl+B)">
             <strong>B</strong>
           </button>
@@ -468,53 +283,47 @@ Instruction: ${instruction}`;
           <span>{wordCount} words</span>
           <span className="info-divider">•</span>
           <span>{charCount} chars</span>
-          {pendingRevisions > 0 && (
-            <>
-              <span className="info-divider">•</span>
-              <span className="pending-revisions">{pendingRevisions} changes</span>
-            </>
-          )}
         </div>
       </div>
       
+      {/* Diff preview for pending changes */}
+      {pendingChange && renderContentWithDiff()}
+      
       <div className="editor-container">
-        <div
+        <textarea
           ref={editorRef}
-          className="editor-contenteditable"
-          contentEditable={true}
-          onInput={handleContentInput}
-          onClick={handleEditorClick}
+          className="editor-textarea"
+          value={localContent}
+          onChange={handleContentChange}
           onMouseUp={handleSelect}
           onKeyUp={handleSelect}
-          suppressContentEditableWarning
           spellCheck
-          data-placeholder="Begin writing... The membrane will learn your patterns."
+          placeholder="Begin writing... Select text and get AI assistance."
         />
       </div>
       
       <div className="editor-hints">
         <span className="hint-item">
-          <span style={{ textDecoration: 'line-through', color: 'rgba(239, 68, 68, 0.7)' }}>Deleted</span>
+          📝 Select text to get AI assistance
         </span>
         <span className="hint-item">
-          <span style={{ background: 'rgba(34, 197, 94, 0.2)', padding: '0 0.25rem', borderRadius: '3px' }}>Inserted</span>
+          💡 Changes are saved automatically
         </span>
-        <span className="hint-item">
-          Click ✓ or ✗ to accept/reject changes
-        </span>
-        <span className="hint-item">
-          Select text to get AI assistance
-        </span>
+        {pendingChange && (
+          <span className="hint-item hint-item--active">
+            ⚡ Pending change - Accept or Reject above
+          </span>
+        )}
       </div>
       
-      {showPopup && selectedTextInfo && (
+      {showPopup && selectedTextInfo && !pendingChange && (
         <SelectionPopup
           selectedText={selectedTextInfo.text}
           position={popupPosition}
           onSubmit={handlePopupSubmit}
           onClose={handlePopupClose}
           isLoading={isGenerating}
-          editorRef={editorRef}
+          editorRef={editorRef as any}
         />
       )}
     </div>
