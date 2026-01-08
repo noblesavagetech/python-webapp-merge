@@ -523,17 +523,8 @@ export function StoryEditor() {
       // Include chapter summary
       const summaryStr = currentChapter.summary || "No summary available";
 
-      // Include beat generator context if available
-      const beatContextStr = beatInput.trim()
-        ? `\n\nBeat/Scene Input from Beat Generator:\n${beatInput}`
-        : "";
-      const beatInstructionsStr =
-        beatPrompt !== defaultBeatPrompt
-          ? `\n\nBeat Generator Instructions:\n${beatPrompt}`
-          : "";
-
       // Construct prompt with FULL character data and all context
-      const fullPrompt = `${prosePrompt}\n\nChapter Summary:\n${summaryStr}\n\n## CHARACTER INFORMATION (use this for characterization):\n${charStr}\n\nBeats/Scenes to Expand:\n${beatsStr}\n\nKey Events:\n${eventsStr}\n\nScene Input: ${sceneInput}\n\nRecent chapter context (last 2000 words):\n${last2000}\n\nWorld Building Elements:\n${worldElementsStr}${beatContextStr}${beatInstructionsStr}`;
+      const fullPrompt = `${prosePrompt}\n\nChapter Summary:\n${summaryStr}\n\n## CHARACTER INFORMATION (use this for characterization):\n${charStr}\n\nBeats/Scenes to Expand:\n${beatsStr}\n\nKey Events:\n${eventsStr}\n\nScene Input: ${sceneInput}\n\nRecent chapter context (last 2000 words):\n${last2000}\n\nWorld Building Elements:\n${worldElementsStr}`;
 
       // Call AI API
       const response = await fetch(`${API_BASE_URL}/api/ai/generate`, {
