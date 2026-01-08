@@ -597,17 +597,8 @@ export function StoryEditor() {
       // Include chapter summary
       const summaryStr = currentChapter.summary || "No summary available";
 
-      // Include prose generator context if available
-      const proseContextStr = sceneInput.trim()
-        ? `\n\nScene Input from Prose Generator:\n${sceneInput}`
-        : "";
-      const proseInstructionsStr =
-        prosePrompt !== defaultProsePrompt
-          ? `\n\nProse Generator Instructions:\n${prosePrompt}`
-          : "";
-
       // Construct prompt with FULL character data and all context
-      const fullPrompt = `${beatPrompt}\n\nChapter Summary:\n${summaryStr}\n\n## CHARACTER INFORMATION (use this for characterization):\n${charStr}\n\nExisting Beats/Scenes:\n${beatsStr}\n\nKey Events:\n${eventsStr}\n\nBeat/Scene Input: ${beatInput}\n\nRecent chapter context (last 2000 words):\n${last2000}\n\nWorld Building Elements:\n${worldElementsStr}${proseContextStr}${proseInstructionsStr}`;
+      const fullPrompt = `${beatPrompt}\n\nChapter Summary:\n${summaryStr}\n\n## CHARACTER INFORMATION (use this for characterization):\n${charStr}\n\nExisting Beats/Scenes:\n${beatsStr}\n\nKey Events:\n${eventsStr}\n\nBeat/Scene Input: ${beatInput}\n\nRecent chapter context (last 2000 words):\n${last2000}\n\nWorld Building Elements:\n${worldElementsStr}`;
 
       // Call AI API
       const response = await fetch(`${API_BASE_URL}/api/ai/generate`, {
