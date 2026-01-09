@@ -228,6 +228,11 @@ export function StoryEditor() {
       // Reload story to refresh chapters array with latest saved data
       const storyResponse = await api.getStory(storyIdNum);
       setStory(storyResponse.story);
+      // Update currentChapter with the fresh data from the reloaded story
+      const updatedChapter = storyResponse.story.chapters?.find((c: any) => c.id === currentChapter.id);
+      if (updatedChapter) {
+        setCurrentChapter(updatedChapter);
+      }
       setSaveMessage("✓ Chapter saved successfully!");
       setTimeout(() => setSaveMessage(""), 3000);
     } catch (error) {
@@ -239,13 +244,24 @@ export function StoryEditor() {
 
   const handleSaveSummary = async () => {
     if (!storyIdNum || !currentChapter) return;
+    console.log("Saving summary for chapter:", currentChapter.id, "Summary:", summary);
     try {
-      await api.updateChapter(currentChapter.id, {
+      const result = await api.updateChapter(currentChapter.id, {
         summary,
       });
+      console.log("API returned:", result);
       // Reload story to refresh chapters array with latest saved data
       const storyResponse = await api.getStory(storyIdNum);
+      console.log("Reloaded story chapters:", storyResponse.story.chapters?.map((c: any) => ({ id: c.id, title: c.title, summary: c.summary?.substring(0, 50) })));
       setStory(storyResponse.story);
+      // Update currentChapter with the fresh data from the reloaded story
+      const updatedChapter = storyResponse.story.chapters?.find((c: any) => c.id === currentChapter.id);
+      console.log("Updated chapter found:", updatedChapter?.id, "Summary:", updatedChapter?.summary?.substring(0, 50));
+      if (updatedChapter) {
+        setCurrentChapter(updatedChapter);
+        // Also update the summary state to match
+        setSummary(updatedChapter.summary || "");
+      }
       setSaveMessage("✓ Summary saved successfully!");
       setTimeout(() => setSaveMessage(""), 3000);
     } catch (error) {
