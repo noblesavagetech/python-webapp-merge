@@ -225,6 +225,9 @@ export function StoryEditor() {
         title,
         text,
       });
+      // Reload story to refresh chapters array with latest saved data
+      const storyResponse = await api.getStory(storyIdNum);
+      setStory(storyResponse.story);
       setSaveMessage("✓ Chapter saved successfully!");
       setTimeout(() => setSaveMessage(""), 3000);
     } catch (error) {
@@ -240,6 +243,9 @@ export function StoryEditor() {
       await api.updateChapter(currentChapter.id, {
         summary,
       });
+      // Reload story to refresh chapters array with latest saved data
+      const storyResponse = await api.getStory(storyIdNum);
+      setStory(storyResponse.story);
       setSaveMessage("✓ Summary saved successfully!");
       setTimeout(() => setSaveMessage(""), 3000);
     } catch (error) {
@@ -482,9 +488,8 @@ export function StoryEditor() {
     setAiProseResult("Generating...");
 
     try {
-      // Get last 2000 words of chapter for context - use current text state, not stale currentChapter.text
-      const chapterWords = (text || "").split(/\s+/);
-      const last2000 = chapterWords.slice(-2000).join(" ");
+      // Use full chapter text as context
+      const chapterText = text || "";
 
       // Format world elements
       const worldElementsStr =
@@ -524,7 +529,7 @@ export function StoryEditor() {
       const summaryStr = summary || "No summary available";
 
       // Construct prompt with FULL character data and all context
-      const fullPrompt = `${prosePrompt}\n\nChapter Summary:\n${summaryStr}\n\n## CHARACTER INFORMATION (use this for characterization):\n${charStr}\n\nBeats/Scenes to Expand:\n${beatsStr}\n\nKey Events:\n${eventsStr}\n\nScene Input: ${sceneInput}\n\nRecent chapter context (last 2000 words):\n${last2000}\n\nWorld Building Elements:\n${worldElementsStr}`;
+      const fullPrompt = `${prosePrompt}\n\nChapter Summary:\n${summaryStr}\n\n## CHARACTER INFORMATION (use this for characterization):\n${charStr}\n\nBeats/Scenes to Expand:\n${beatsStr}\n\nKey Events:\n${eventsStr}\n\nScene Input: ${sceneInput}\n\nCurrent chapter context:\n${chapterText}\n\nWorld Building Elements:\n${worldElementsStr}`;
 
       // Call AI API
       const response = await fetch(`${API_BASE_URL}/api/ai/generate`, {
@@ -556,9 +561,8 @@ export function StoryEditor() {
     setAiBeatResult("Generating...");
 
     try {
-      // Get last 2000 words of chapter for context - use current text state, not stale currentChapter.text
-      const chapterWords = (text || "").split(/\s+/);
-      const last2000 = chapterWords.slice(-2000).join(" ");
+      // Use full chapter text as context
+      const chapterText = text || "";
 
       // Format world elements
       const worldElementsStr =
@@ -598,7 +602,7 @@ export function StoryEditor() {
       const summaryStr = summary || "No summary available";
 
       // Construct prompt with FULL character data and all context
-      const fullPrompt = `${beatPrompt}\n\nChapter Summary:\n${summaryStr}\n\n## CHARACTER INFORMATION (use this for characterization):\n${charStr}\n\nExisting Beats/Scenes:\n${beatsStr}\n\nKey Events:\n${eventsStr}\n\nBeat/Scene Input: ${beatInput}\n\nRecent chapter context (last 2000 words):\n${last2000}\n\nWorld Building Elements:\n${worldElementsStr}`;
+      const fullPrompt = `${beatPrompt}\n\nChapter Summary:\n${summaryStr}\n\n## CHARACTER INFORMATION (use this for characterization):\n${charStr}\n\nExisting Beats/Scenes:\n${beatsStr}\n\nKey Events:\n${eventsStr}\n\nBeat/Scene Input: ${beatInput}\n\nCurrent chapter context:\n${chapterText}\n\nWorld Building Elements:\n${worldElementsStr}`;
 
       // Call AI API
       const response = await fetch(`${API_BASE_URL}/api/ai/generate`, {
