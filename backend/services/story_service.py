@@ -31,6 +31,8 @@ class StoryService:
         return story
     
     def get_story(self, db: Session, story_id: int, user_id: int) -> Optional[Story]:
+        # Expire all objects to ensure fresh data from database
+        db.expire_all()
         return db.query(Story).filter(
             Story.id == story_id,
             Story.user_id == user_id
