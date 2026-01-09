@@ -340,6 +340,9 @@
   border-radius: var(--radius-md);
   margin: 1rem;
   overflow: hidden;
+  max-height: 60vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .diff-header {
@@ -349,6 +352,7 @@
   padding: 0.75rem 1rem;
   background: rgba(139, 92, 246, 0.1);
   border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
 }
 
 .diff-title {
@@ -399,6 +403,9 @@
   line-height: 1.6;
   white-space: pre-wrap;
   word-wrap: break-word;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .diff-context {
