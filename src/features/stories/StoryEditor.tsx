@@ -488,8 +488,9 @@ export function StoryEditor() {
     setAiProseResult("Generating...");
 
     try {
-      // Use full chapter text as context
-      const chapterText = text || "";
+      // Get last 2500 words of chapter for context
+      const chapterWords = (text || "").split(/\s+/);
+      const chapterText = chapterWords.slice(-2500).join(" ");
 
       // Format world elements
       const worldElementsStr =
@@ -561,8 +562,9 @@ export function StoryEditor() {
     setAiBeatResult("Generating...");
 
     try {
-      // Use full chapter text as context
-      const chapterText = text || "";
+      // Get last 2500 words of chapter for context
+      const chapterWords = (text || "").split(/\s+/);
+      const chapterText = chapterWords.slice(-2500).join(" ");
 
       // Format world elements
       const worldElementsStr =
