@@ -482,8 +482,8 @@ export function StoryEditor() {
     setAiProseResult("Generating...");
 
     try {
-      // Get last 2000 words of chapter for context
-      const chapterWords = (currentChapter.text || "").split(/\s+/);
+      // Get last 2000 words of chapter for context - use current text state, not stale currentChapter.text
+      const chapterWords = (text || "").split(/\s+/);
       const last2000 = chapterWords.slice(-2000).join(" ");
 
       // Format world elements
@@ -520,8 +520,8 @@ export function StoryEditor() {
         ? selectedCharsWithDetails.join('\n\n')
         : "(No characters selected - available: " + characters.map(c => c.name).join(', ') + ")";
 
-      // Include chapter summary
-      const summaryStr = currentChapter.summary || "No summary available";
+      // Include chapter summary - use current summary state, not stale currentChapter.summary
+      const summaryStr = summary || "No summary available";
 
       // Construct prompt with FULL character data and all context
       const fullPrompt = `${prosePrompt}\n\nChapter Summary:\n${summaryStr}\n\n## CHARACTER INFORMATION (use this for characterization):\n${charStr}\n\nBeats/Scenes to Expand:\n${beatsStr}\n\nKey Events:\n${eventsStr}\n\nScene Input: ${sceneInput}\n\nRecent chapter context (last 2000 words):\n${last2000}\n\nWorld Building Elements:\n${worldElementsStr}`;
@@ -556,8 +556,8 @@ export function StoryEditor() {
     setAiBeatResult("Generating...");
 
     try {
-      // Get last 2000 words of chapter for context
-      const chapterWords = (currentChapter.text || "").split(/\s+/);
+      // Get last 2000 words of chapter for context - use current text state, not stale currentChapter.text
+      const chapterWords = (text || "").split(/\s+/);
       const last2000 = chapterWords.slice(-2000).join(" ");
 
       // Format world elements
@@ -594,8 +594,8 @@ export function StoryEditor() {
         ? selectedCharsWithDetails.join('\n\n')
         : "(No characters selected - available: " + characters.map(c => c.name).join(', ') + ")";
 
-      // Include chapter summary
-      const summaryStr = currentChapter.summary || "No summary available";
+      // Include chapter summary - use current summary state, not stale currentChapter.summary
+      const summaryStr = summary || "No summary available";
 
       // Construct prompt with FULL character data and all context
       const fullPrompt = `${beatPrompt}\n\nChapter Summary:\n${summaryStr}\n\n## CHARACTER INFORMATION (use this for characterization):\n${charStr}\n\nExisting Beats/Scenes:\n${beatsStr}\n\nKey Events:\n${eventsStr}\n\nBeat/Scene Input: ${beatInput}\n\nRecent chapter context (last 2000 words):\n${last2000}\n\nWorld Building Elements:\n${worldElementsStr}`;
