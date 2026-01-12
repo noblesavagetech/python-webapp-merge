@@ -27,6 +27,12 @@
   justify-content: space-between;
   padding: 12px 12px 8px 12px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: grab;
+  user-select: none;
+}
+
+.selection-popup__header:active {
+  cursor: grabbing;
 }
 
 .selection-popup__selected-text {

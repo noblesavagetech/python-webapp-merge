@@ -21,6 +21,38 @@ export function SelectionPopup({
   const [input, setInput] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
+  const [popupPosition, setPopupPosition] = useState(position);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+  // Update position when prop changes
+  useEffect(() => {
+    setPopupPosition(position);
+  }, [position]);
+
+  // Handle dragging
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      setPopupPosition({
+        x: e.clientX - dragOffset.x,
+        y: e.clientY - dragOffset.y
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, dragOffset]);
 
   useEffect(() => {
     // Close on outside click (but not on editor)
@@ -55,14 +87,31 @@ export function SelectionPopup({
     }
   };
 
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Only allow dragging from the header
+    const target = e.target as HTMLElement;
+    if (!target.closest('.selection-popup__header')) return;
+    if (target.closest('.selection-popup__close')) return;
+
+    const rect = popupRef.current?.getBoundingClientRect();
+    if (rect) {
+      setDragOffset({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      });
+      setIsDragging(true);
+    }
+  };
+
   return (
     <div 
       ref={popupRef}
       className="selection-popup" 
       style={{ 
-        left: `${position.x}px`, 
-        top: `${position.y}px` 
+        left: `${popupPosition.x}px`, 
+        top: `${popupPosition.y}px` 
       }}
+      onMouseDown={handleMouseDown}
     >
       <div className="selection-popup__header">
         <div className="selection-popup__selected-text">
