@@ -653,13 +653,19 @@ async def upload_file(
         # Extract text content
         content = await file_service.extract_text(file_path)
         
-        # Only add to vector store if training and vector service is available
+        # Add ALL uploaded files to vector store (both train and context)
+        # The difference is just metadata, not whether they're indexed
         processed_successfully = False
-        if train and vector_service and vector_service.enabled:
+        if vector_service and vector_service.enabled:
             try:
                 collection_name = f"user_{current_user.id}_project_{project_id}"
-                print(f"📤 Adding file '{file.filename}' to vector store (collection: {collection_name})")
-                await vector_service.add_memory(collection_name, content, metadata={"source": file.filename})
+                file_type = "training" if train else "context"
+                print(f"📤 Adding file '{file.filename}' to vector store as {file_type} (collection: {collection_name})")
+                await vector_service.add_memory(
+                    collection_name, 
+                    content, 
+                    metadata={"source": file.filename, "type": file_type}
+                )
                 processed_successfully = True
                 print(f"✅ File '{file.filename}' added to vector store successfully")
             except Exception as e:
@@ -667,7 +673,7 @@ async def upload_file(
                 import traceback
                 traceback.print_exc()
                 # Continue anyway - file is still saved
-        elif train:
+        else:
             print(f"⚠️  Vector service not available - file '{file.filename}' saved but not indexed")
         
         # Save file record to database
