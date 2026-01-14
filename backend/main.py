@@ -502,6 +502,18 @@ async def chat_stream(
     ]) if recent_messages else "(No previous conversation)"
     
     # Build context - include FULL document content
+    memories_section = ""
+    if memories:
+        memories_section = f"""
+
+UPLOADED CONTEXT FILES:
+The user has uploaded the following files for you to reference:
+
+{chr(10).join(f"File content: {m}" for m in memories)}
+
+You MUST acknowledge and use the information from these uploaded files when relevant to the user's questions.
+"""
+    
     context = f"""Purpose: {request.purpose}
 Partner mode: {request.partner}
 
@@ -511,17 +523,15 @@ Full Document content:
 {f"Selected text: {request.selected_text}" if request.selected_text else ""}
 
 Recent conversation:
-{chat_history}
-
-Relevant memories from trained files:
-{chr(10).join(f"- {m}" for m in memories)}
+{chat_history}{memories_section}
 """
     
     # Debug: Log what memories are being sent
     if memories:
         print(f"📋 Sending {len(memories)} memories to AI:")
         for i, mem in enumerate(memories[:3], 1):  # Show first 3
-            print(f"   {i}. {mem[:100]}...")
+            mem_preview = mem[:200] if len(mem) > 200 else mem
+            print(f"   {i}. [{len(mem)} chars] {mem_preview}...")
     else:
         print("⚠️  No memories to send to AI")
     
