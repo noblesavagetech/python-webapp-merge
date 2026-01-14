@@ -167,12 +167,12 @@ class VectorService:
                         }
                     )
                 else:
-                    # Use JSONB
+                    # Use JSONB - pass the JSON string directly without ::jsonb cast
                     conn.execute(
                         text("""
                             INSERT INTO vector_embeddings 
                             (collection_name, content, embedding, metadata)
-                            VALUES (:collection, :content, :embedding::jsonb, :metadata::jsonb)
+                            VALUES (:collection, :content, :embedding, :metadata)
                         """),
                         {
                             "collection": collection_name,
