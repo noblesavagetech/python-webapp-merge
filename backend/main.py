@@ -517,6 +517,14 @@ Relevant memories from trained files:
 {chr(10).join(f"- {m}" for m in memories)}
 """
     
+    # Debug: Log what memories are being sent
+    if memories:
+        print(f"📋 Sending {len(memories)} memories to AI:")
+        for i, mem in enumerate(memories[:3], 1):  # Show first 3
+            print(f"   {i}. {mem[:100]}...")
+    else:
+        print("⚠️  No memories to send to AI")
+    
     # Save user message to database
     user_message = ChatMessage(
         project_id=project_id,
