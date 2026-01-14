@@ -131,6 +131,12 @@ class VectorService:
             )
             response.raise_for_status()
             data = response.json()
+            
+            # Check if response has expected format
+            if "data" not in data:
+                print(f"❌ OpenRouter embedding error: {data}")
+                raise Exception(f"OpenRouter API error: {data.get('error', {}).get('message', 'Unknown error')}")
+            
             return data["data"][0]["embedding"]
     
     async def add_memory(
@@ -143,6 +149,26 @@ class VectorService:
         if not self.enabled:
             print("⚠️  VectorService is disabled")
             return
+        
+        # Split large content into chunks (max ~8000 tokens = ~32000 chars)
+        max_chunk_size = 30000
+        if len(content) > max_chunk_size:
+            print(f"📄 File is large ({len(content)} chars), splitting into chunks")
+            chunks = [content[i:i+max_chunk_size] for i in range(0, len(content), max_chunk_size)]
+            
+            for idx, chunk in enumerate(chunks):
+                chunk_metadata = {**(metadata or {}), "chunk": idx + 1, "total_chunks": len(chunks)}
+                await self._add_single_memory(collection_name, chunk, chunk_metadata)
+        else:
+            await self._add_single_memory(collection_name, content, metadata)
+    
+    async def _add_single_memory(
+        self,
+        collection_name: str,
+        content: str,
+        metadata: Optional[Dict] = None
+    ):
+        """Add a single content chunk to vector memory"""
             
         # Generate embedding via OpenRouter
         embedding = await self._get_embedding(content)
