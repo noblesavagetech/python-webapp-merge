@@ -19,14 +19,17 @@ class VectorService:
         
         # Only initialize if we have a PostgreSQL database
         self.enabled = False
+        self.use_pgvector = False
         if self.database_url and not self.database_url.startswith("sqlite"):
             try:
                 self.engine = create_engine(self.database_url)
                 self._ensure_table()
                 self.enabled = True
-                print("✅ VectorService initialized with pgvector")
+                print(f"✅ VectorService initialized (pgvector: {self.use_pgvector})")
             except Exception as e:
-                print(f"⚠️  VectorService disabled: {e}")
+                print(f"❌ VectorService initialization failed: {e}")
+                import traceback
+                traceback.print_exc()
         else:
             print("⚠️  VectorService disabled: SQLite detected (pgvector requires PostgreSQL)")
     

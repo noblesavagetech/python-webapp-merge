@@ -481,7 +481,15 @@ async def chat_stream(
     
     # Get relevant memories from vector store
     collection_name = f"user_{current_user.id}_project_{project_id}"
-    memories = await vector_service.search(collection_name, request.message, top_k=3) if vector_service else []
+    memories = []
+    if vector_service and vector_service.enabled:
+        try:
+            memories = await vector_service.search(collection_name, request.message, top_k=3)
+            print(f"✅ Found {len(memories)} memories for query: {request.message[:50]}...")
+        except Exception as e:
+            print(f"⚠️  Error searching memories: {e}")
+    else:
+        print("⚠️  Vector service not available for memory search")
     
     # Get recent chat history
     recent_messages = db.query(ChatMessage).filter(
@@ -647,16 +655,20 @@ async def upload_file(
         
         # Only add to vector store if training and vector service is available
         processed_successfully = False
-        if train and vector_service:
+        if train and vector_service and vector_service.enabled:
             try:
                 collection_name = f"user_{current_user.id}_project_{project_id}"
+                print(f"📤 Adding file '{file.filename}' to vector store (collection: {collection_name})")
                 await vector_service.add_memory(collection_name, content, metadata={"source": file.filename})
                 processed_successfully = True
+                print(f"✅ File '{file.filename}' added to vector store successfully")
             except Exception as e:
-                print(f"Warning: Could not add to vector store: {e}")
+                print(f"❌ Could not add to vector store: {e}")
                 import traceback
                 traceback.print_exc()
                 # Continue anyway - file is still saved
+        elif train:
+            print(f"⚠️  Vector service not available - file '{file.filename}' saved but not indexed")
         
         # Save file record to database
         file_record = FileUpload(
