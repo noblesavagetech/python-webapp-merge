@@ -484,7 +484,8 @@ async def chat_stream(
     memories = []
     if vector_service and vector_service.enabled:
         try:
-            memories = await vector_service.search(collection_name, request.message, top_k=3)
+            # Search for top 10 chunks to ensure we get multiple parts of large files
+            memories = await vector_service.search(collection_name, request.message, top_k=10)
             print(f"✅ Found {len(memories)} memories for query: {request.message[:50]}...")
         except Exception as e:
             print(f"⚠️  Error searching memories: {e}")
