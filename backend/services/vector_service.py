@@ -36,19 +36,36 @@ class VectorService:
     def _ensure_table(self):
         """Create vector embeddings table - uses JSONB if pgvector not available"""
         with self.engine.connect() as conn:
-            # First try to enable pgvector extension
+            # First check if table exists
+            result = conn.execute(text("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_name = 'vector_embeddings'
+                )
+            """))
+            table_exists = result.scalar()
+            
+            # If table exists, drop it to ensure clean schema
+            if table_exists:
+                print("🔄 Dropping existing vector_embeddings table for schema update")
+                conn.execute(text("DROP TABLE IF EXISTS vector_embeddings CASCADE"))
+                conn.commit()
+            
+            # Try to enable pgvector extension
             try:
                 conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
                 conn.commit()
                 self.use_pgvector = True
-            except Exception:
+                print("✅ pgvector extension enabled")
+            except Exception as e:
                 # pgvector not available, use JSONB instead
                 self.use_pgvector = False
+                print(f"ℹ️  pgvector not available, using JSONB fallback: {e}")
             
             if self.use_pgvector:
                 # Use native vector type
                 conn.execute(text("""
-                    CREATE TABLE IF NOT EXISTS vector_embeddings (
+                    CREATE TABLE vector_embeddings (
                         id SERIAL PRIMARY KEY,
                         collection_name VARCHAR(255) NOT NULL,
                         content TEXT NOT NULL,
@@ -61,18 +78,18 @@ class VectorService:
                 # Create index for faster similarity search
                 try:
                     conn.execute(text("""
-                        CREATE INDEX IF NOT EXISTS vector_embeddings_embedding_idx 
+                        CREATE INDEX vector_embeddings_embedding_idx 
                         ON vector_embeddings 
                         USING ivfflat (embedding vector_cosine_ops)
                         WITH (lists = 100)
                     """))
-                except Exception:
+                except Exception as idx_error:
                     # Index might fail, that's ok
-                    pass
+                    print(f"ℹ️  Could not create ivfflat index: {idx_error}")
             else:
                 # Fallback: use JSONB for embeddings
                 conn.execute(text("""
-                    CREATE TABLE IF NOT EXISTS vector_embeddings (
+                    CREATE TABLE vector_embeddings (
                         id SERIAL PRIMARY KEY,
                         collection_name VARCHAR(255) NOT NULL,
                         content TEXT NOT NULL,
@@ -84,7 +101,7 @@ class VectorService:
             
             # Create unique index to prevent duplicates
             conn.execute(text("""
-                CREATE UNIQUE INDEX IF NOT EXISTS vector_embeddings_unique_idx 
+                CREATE UNIQUE INDEX vector_embeddings_unique_idx 
                 ON vector_embeddings (collection_name, MD5(content))
             """))
             
