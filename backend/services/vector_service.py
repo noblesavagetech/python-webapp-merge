@@ -31,18 +31,53 @@ class VectorService:
             print("⚠️  VectorService disabled: SQLite detected (pgvector requires PostgreSQL)")
     
     def _ensure_table(self):
-        """Create vector embeddings table if it doesn't exist"""
+        """Create vector embeddings table - uses JSONB if pgvector not available"""
         with self.engine.connect() as conn:
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS vector_embeddings (
-                    id SERIAL PRIMARY KEY,
-                    collection_name VARCHAR(255) NOT NULL,
-                    content TEXT NOT NULL,
-                    embedding vector(1536),
-                    metadata JSONB,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
+            # First try to enable pgvector extension
+            try:
+                conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+                conn.commit()
+                self.use_pgvector = True
+            except Exception:
+                # pgvector not available, use JSONB instead
+                self.use_pgvector = False
+            
+            if self.use_pgvector:
+                # Use native vector type
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS vector_embeddings (
+                        id SERIAL PRIMARY KEY,
+                        collection_name VARCHAR(255) NOT NULL,
+                        content TEXT NOT NULL,
+                        embedding vector(1536),
+                        metadata JSONB,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """))
+                
+                # Create index for faster similarity search
+                try:
+                    conn.execute(text("""
+                        CREATE INDEX IF NOT EXISTS vector_embeddings_embedding_idx 
+                        ON vector_embeddings 
+                        USING ivfflat (embedding vector_cosine_ops)
+                        WITH (lists = 100)
+                    """))
+                except Exception:
+                    # Index might fail, that's ok
+                    pass
+            else:
+                # Fallback: use JSONB for embeddings
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS vector_embeddings (
+                        id SERIAL PRIMARY KEY,
+                        collection_name VARCHAR(255) NOT NULL,
+                        content TEXT NOT NULL,
+                        embedding JSONB,
+                        metadata JSONB,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """))
             
             # Create unique index to prevent duplicates
             conn.execute(text("""
@@ -50,14 +85,8 @@ class VectorService:
                 ON vector_embeddings (collection_name, MD5(content))
             """))
             
-            # Create index for faster similarity search
-            conn.execute(text("""
-                CREATE INDEX IF NOT EXISTS vector_embeddings_embedding_idx 
-                ON vector_embeddings 
-                USING ivfflat (embedding vector_cosine_ops)
-                WITH (lists = 100)
-            """))
             conn.commit()
+            print(f"✅ Vector table created (using {'pgvector' if self.use_pgvector else 'JSONB fallback'})")
     
     async def _get_embedding(self, text: str) -> List[float]:
         """Get embedding from OpenRouter API"""
@@ -97,25 +126,40 @@ class VectorService:
         # Generate embedding via OpenRouter
         embedding = await self._get_embedding(content)
         
-        # Convert embedding list to PostgreSQL vector format
-        embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
-        
-        # Insert into database (will skip if duplicate due to unique index)
+        # Insert into database
         with self.engine.connect() as conn:
             try:
-                conn.execute(
-                    text("""
-                        INSERT INTO vector_embeddings 
-                        (collection_name, content, embedding, metadata)
-                        VALUES (:collection, :content, :embedding::vector, :metadata::jsonb)
-                    """),
-                    {
-                        "collection": collection_name,
-                        "content": content,
-                        "embedding": embedding_str,
-                        "metadata": json.dumps(metadata or {})
-                    }
-                )
+                if self.use_pgvector:
+                    # Use native vector type
+                    embedding_str = "[" + ",".join(str(x) for x in embedding) + "]"
+                    conn.execute(
+                        text("""
+                            INSERT INTO vector_embeddings 
+                            (collection_name, content, embedding, metadata)
+                            VALUES (:collection, :content, :embedding::vector, :metadata::jsonb)
+                        """),
+                        {
+                            "collection": collection_name,
+                            "content": content,
+                            "embedding": embedding_str,
+                            "metadata": json.dumps(metadata or {})
+                        }
+                    )
+                else:
+                    # Use JSONB
+                    conn.execute(
+                        text("""
+                            INSERT INTO vector_embeddings 
+                            (collection_name, content, embedding, metadata)
+                            VALUES (:collection, :content, :embedding::jsonb, :metadata::jsonb)
+                        """),
+                        {
+                            "collection": collection_name,
+                            "content": content,
+                            "embedding": json.dumps(embedding),
+                            "metadata": json.dumps(metadata or {})
+                        }
+                    )
                 conn.commit()
             except Exception as e:
                 # Likely a duplicate, ignore
@@ -138,25 +182,46 @@ class VectorService:
             # Generate query embedding via OpenRouter
             query_embedding = await self._get_embedding(query)
             
-            # Convert to PostgreSQL vector format
-            embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
-            
-            # Search using cosine similarity (<=> operator)
             with self.engine.connect() as conn:
-                results = conn.execute(
-                    text("""
-                        SELECT content
-                        FROM vector_embeddings
-                        WHERE collection_name = :collection
-                        ORDER BY embedding <=> :query_embedding::vector
-                        LIMIT :limit
-                    """),
-                    {
-                        "collection": collection_name,
-                        "query_embedding": embedding_str,
-                        "limit": top_k
-                    }
-                )
+                if self.use_pgvector:
+                    # Use native pgvector similarity search
+                    embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
+                    results = conn.execute(
+                        text("""
+                            SELECT content
+                            FROM vector_embeddings
+                            WHERE collection_name = :collection
+                            ORDER BY embedding <=> :query_embedding::vector
+                            LIMIT :limit
+                        """),
+                        {
+                            "collection": collection_name,
+                            "query_embedding": embedding_str,
+                            "limit": top_k
+                        }
+                    )
+                else:
+                    # Fallback: compute cosine similarity in Python
+                    results = conn.execute(
+                        text("""
+                            SELECT content, embedding
+                            FROM vector_embeddings
+                            WHERE collection_name = :collection
+                        """),
+                        {"collection": collection_name}
+                    )
+                    
+                    # Compute similarities and sort
+                    docs_with_scores = []
+                    for row in results:
+                        content = row[0]
+                        embedding = json.loads(row[1])
+                        similarity = self._cosine_similarity(query_embedding, embedding)
+                        docs_with_scores.append((content, similarity))
+                    
+                    # Sort by similarity and take top_k
+                    docs_with_scores.sort(key=lambda x: x[1], reverse=True)
+                    return [doc for doc, _ in docs_with_scores[:top_k]]
                 
                 return [row[0] for row in results]
         except Exception as e:
@@ -164,6 +229,14 @@ class VectorService:
             import traceback
             traceback.print_exc()
             return []
+    
+    def _cosine_similarity(self, a: List[float], b: List[float]) -> float:
+        """Compute cosine similarity between two vectors"""
+        import math
+        dot_product = sum(x * y for x, y in zip(a, b))
+        norm_a = math.sqrt(sum(x * x for x in a))
+        norm_b = math.sqrt(sum(y * y for y in b))
+        return dot_product / (norm_a * norm_b) if norm_a and norm_b else 0.0
     
     def delete_project_memories(self, collection_name: str):
         """Delete all memories for a collection"""
