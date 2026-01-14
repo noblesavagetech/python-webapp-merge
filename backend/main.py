@@ -64,7 +64,7 @@ vector_service = None
 if VECTOR_SERVICE_AVAILABLE:
     try:
         vector_service = VectorService(
-            db_dir=os.getenv("VECTOR_DB_DIR", "./data/vectordb"),
+            database_url=os.getenv("DATABASE_URL"),
             openrouter_api_key=openrouter_api_key
         )
         print("VectorService initialized successfully")

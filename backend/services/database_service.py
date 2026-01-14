@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from typing import Generator
 import os
@@ -58,9 +58,21 @@ def init_db():
     Initialize the database with try-create logic per SOP:
     - Creates all tables if they don't exist
     - Handles cold-start scenarios gracefully
+    - Enables pgvector extension for PostgreSQL
     """
     try:
         logger.info("🔧 Initializing database schema...")
+        
+        # Enable pgvector extension for PostgreSQL
+        if not DATABASE_URL.startswith("sqlite"):
+            try:
+                with engine.connect() as conn:
+                    conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+                    conn.commit()
+                logger.info("✅ pgvector extension enabled")
+            except Exception as e:
+                logger.warning(f"⚠️  Could not enable pgvector extension: {e}")
+        
         Base.metadata.create_all(bind=engine)
         logger.info("✅ Database schema initialized successfully")
     except Exception as e:
