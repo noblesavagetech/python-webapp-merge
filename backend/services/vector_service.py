@@ -35,8 +35,21 @@ class VectorService:
     
     def _ensure_table(self):
         """Create vector embeddings table - uses JSONB if pgvector not available"""
+        # Try to enable pgvector extension in a separate transaction
+        self.use_pgvector = False
+        try:
+            with self.engine.connect() as conn:
+                conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+                conn.commit()
+                self.use_pgvector = True
+                print("✅ pgvector extension enabled")
+        except Exception as e:
+            # pgvector not available, use JSONB instead
+            print(f"ℹ️  pgvector not available, using JSONB fallback")
+        
+        # Now create/update table in a fresh transaction
         with self.engine.connect() as conn:
-            # First check if table exists
+            # Check if table exists
             result = conn.execute(text("""
                 SELECT EXISTS (
                     SELECT FROM information_schema.tables 
@@ -50,17 +63,6 @@ class VectorService:
                 print("🔄 Dropping existing vector_embeddings table for schema update")
                 conn.execute(text("DROP TABLE IF EXISTS vector_embeddings CASCADE"))
                 conn.commit()
-            
-            # Try to enable pgvector extension
-            try:
-                conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-                conn.commit()
-                self.use_pgvector = True
-                print("✅ pgvector extension enabled")
-            except Exception as e:
-                # pgvector not available, use JSONB instead
-                self.use_pgvector = False
-                print(f"ℹ️  pgvector not available, using JSONB fallback: {e}")
             
             if self.use_pgvector:
                 # Use native vector type
@@ -84,7 +86,6 @@ class VectorService:
                         WITH (lists = 100)
                     """))
                 except Exception as idx_error:
-                    # Index might fail, that's ok
                     print(f"ℹ️  Could not create ivfflat index: {idx_error}")
             else:
                 # Fallback: use JSONB for embeddings
