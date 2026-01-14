@@ -236,7 +236,8 @@ class VectorService:
                     docs_with_scores = []
                     for row in results:
                         content = row[0]
-                        embedding = json.loads(row[1])
+                        # PostgreSQL JSONB is already deserialized to Python list
+                        embedding = row[1] if isinstance(row[1], list) else json.loads(row[1])
                         similarity = self._cosine_similarity(query_embedding, embedding)
                         docs_with_scores.append((content, similarity))
                     
