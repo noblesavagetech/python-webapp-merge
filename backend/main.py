@@ -1541,6 +1541,18 @@ async def generate_ai_content(
             raise HTTPException(status_code=500, detail="OpenRouter API key not configured")
         
         async with httpx.AsyncClient(timeout=60.0) as client:
+            # Prepare the request payload
+            payload = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}]
+            }
+            
+            # Some models need explicit max_tokens
+            if "deepseek" in model.lower() or "gemini" in model.lower():
+                payload["max_tokens"] = 4000
+            
+            print(f"Sending request to OpenRouter with model: {model}")  # Debug log
+            
             response = await client.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={
@@ -1549,22 +1561,31 @@ async def generate_ai_content(
                     "HTTP-Referer": os.getenv("SITE_URL", "http://localhost:8000"),
                     "X-Title": os.getenv("SITE_NAME", "StoryEngine")
                 },
-                json={
-                    "model": model,  # Use the model from the request
-                    "messages": [{"role": "user", "content": prompt}]
-                }
+                json=payload
             )
             
             if response.status_code != 200:
-                raise HTTPException(status_code=response.status_code, detail=f"OpenRouter API error: {response.text}")
+                error_detail = f"OpenRouter API error (status {response.status_code}): {response.text}"
+                print(f"ERROR: {error_detail}")  # Log to Railway logs
+                raise HTTPException(status_code=response.status_code, detail=error_detail)
             
             data = response.json()
+            
+            # Debug logging for Railway
+            print(f"OpenRouter response for model {model}: {data}")
+            
             content = data.get('choices', [{}])[0].get('message', {}).get('content', '')
             
             return {"content": content, "type": content_type, "model": model}
     
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI generation failed: {str(e)}")
+        error_msg = f"AI generation failed for model {model}: {str(e)}"
+        print(f"ERROR: {error_msg}")  # Log to Railway logs
+        import traceback
+        print(traceback.format_exc())  # Full traceback to Railway logs
+        raise HTTPException(status_code=500, detail=error_msg)
 
 @app.post("/api/stories/generate")
 async def generate_story_content(
